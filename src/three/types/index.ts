@@ -13,4 +13,6 @@ export interface WorldModule {
 /** 挂载后返回的控制句柄 */
 export interface WorldHandle {
   dispose: Disposer
+  /** MediaPipe 手势控制（mountWorld gestureControl: true 时可用） */
+  gesture?: import('../controls/createGestureControl').GestureControlHandle
 }

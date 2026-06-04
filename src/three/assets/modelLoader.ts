@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { disposeObject3D } from '../utils/dispose'
+import { getModelAnchor } from './mountSlots'
 import type { ModelPlacement } from './modelRegistry'
 
 export interface LoadedModel {
@@ -46,6 +47,38 @@ function toScaleVector(
   return Array.isArray(value) ? new THREE.Vector3(...value) : value
 }
 
+function prepareGltfMaterials(root: THREE.Object3D): void {
+  root.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return
+
+    const materials = Array.isArray(child.material) ? child.material : [child.material]
+    for (const material of materials) {
+      if (!material) continue
+
+      const maps = [
+        'map',
+        'emissiveMap',
+        'normalMap',
+        'roughnessMap',
+        'metalnessMap',
+        'aoMap',
+      ] as const
+
+      for (const key of maps) {
+        const tex = material[key]
+        if (tex && 'colorSpace' in tex) {
+          tex.colorSpace = THREE.SRGBColorSpace
+        }
+      }
+
+      if (material instanceof THREE.MeshStandardMaterial) {
+        material.envMapIntensity = 1
+        material.roughness = Math.min(material.roughness, 0.95)
+      }
+    }
+  })
+}
+
 function applyShadowFlags(root: THREE.Object3D, cast: boolean, receive: boolean): void {
   root.traverse((child) => {
     if (child instanceof THREE.Mesh) {
@@ -55,7 +88,6 @@ function applyShadowFlags(root: THREE.Object3D, cast: boolean, receive: boolean)
   })
 }
 
-/** 加载单个 GLTF/GLB 模型 */
 export function loadGltfModel(options: LoadModelOptions): Promise<LoadedModel> {
   const {
     url,
@@ -70,6 +102,8 @@ export function loadGltfModel(options: LoadModelOptions): Promise<LoadedModel> {
       (gltf) => {
         const root = gltf.scene
         root.name = name
+
+        prepareGltfMaterials(root)
 
         const position = toVector3(options.position)
         const rotation = toEuler(options.rotation)
@@ -113,14 +147,11 @@ export interface LoadModelsContext {
   getIslandGroup?: (index: number) => THREE.Group | undefined
 }
 
-/** 按注册表批量加载模型并挂到场景 */
 export async function loadRegisteredModels(
   placements: ModelPlacement[],
   context: LoadModelsContext,
 ): Promise<LoadedModel[]> {
-  if (placements.length === 0) {
-    return []
-  }
+  if (placements.length === 0) return []
 
   const results: LoadedModel[] = []
 
@@ -136,12 +167,19 @@ export async function loadRegisteredModels(
         receiveShadow: placement.receiveShadow,
       })
 
-      const parent =
-        placement.islandIndex !== undefined
-          ? context.getIslandGroup?.(placement.islandIndex)
-          : context.modelsRoot
+      let parent: THREE.Object3D = context.modelsRoot
 
-      ;(parent ?? context.modelsRoot).add(model.root)
+      if (placement.slotId) {
+        const anchor = getModelAnchor(placement.slotId)
+        parent = anchor ?? context.modelsRoot
+        if (!anchor) {
+          console.warn(`[models] 未找到挂点: ${placement.slotId}`)
+        }
+      } else if (placement.mountainIndex !== undefined) {
+        parent = context.getIslandGroup?.(placement.mountainIndex) ?? context.modelsRoot
+      }
+
+      parent.add(model.root)
       results.push(model)
     } catch (error) {
       console.warn(`[models] 加载失败: ${placement.url}`, error)

@@ -1,7 +1,6 @@
 import * as THREE from 'three'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 
 export interface PostProcessing {
@@ -10,7 +9,7 @@ export interface PostProcessing {
   dispose: () => void
 }
 
-/** 后期：轻微 Bloom 提升画面层次 */
+/** 写实后期：仅色彩输出，无风格化 Bloom */
 export function createPostProcessing(
   renderer: THREE.WebGLRenderer,
   scene: THREE.Scene,
@@ -19,26 +18,12 @@ export function createPostProcessing(
   height: number,
 ): PostProcessing {
   const composer = new EffectComposer(renderer)
-
   composer.addPass(new RenderPass(scene, camera))
-
-  const bloom = new UnrealBloomPass(
-    new THREE.Vector2(width, height),
-    0.22,
-    0.45,
-    0.82,
-  )
-  composer.addPass(bloom)
   composer.addPass(new OutputPass())
 
   return {
     composer,
-    resize: (w, h) => {
-      composer.setSize(w, h)
-      bloom.resolution.set(w, h)
-    },
-    dispose: () => {
-      composer.dispose()
-    },
+    resize: (w, h) => composer.setSize(w, h),
+    dispose: () => composer.dispose(),
   }
 }

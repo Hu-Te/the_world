@@ -7,7 +7,7 @@ export function createFog(): WorldModule {
   const group = new THREE.Group()
   group.name = 'Fog'
 
-  const fog = new THREE.Fog(Palette.fog, 90, 420)
+  const fog = new THREE.Fog(Palette.fog, 120, 520)
   group.userData.sceneFog = fog
 
   return {

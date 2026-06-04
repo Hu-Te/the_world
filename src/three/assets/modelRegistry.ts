@@ -5,18 +5,31 @@ export interface ModelPlacement {
   /** 相对 public 的路径，如 `/models/sect-hall.glb` */
   url: string
   name: string
+
+  /**
+   * 挂到预定义锚点（推荐）。
+   * 见 assets/mountSlots.ts 中 MODEL_MOUNT_SLOTS。
+   */
+  slotId?: string
+
+  /** 相对锚点或父级的局部偏移 */
   position?: [number, number, number]
   rotation?: [number, number, number]
   scale?: number | [number, number, number]
-  /** 挂到指定浮岛索引；不填则挂到 modelsRoot */
-  islandIndex?: number
+
+  /** 无 slotId 时：挂到指定山体索引 */
+  mountainIndex?: number
   castShadow?: boolean
   receiveShadow?: boolean
 }
 
 /**
- * 模型清单：后续导入模型时在此追加即可。
- * 示例：
- * { url: '/models/pagoda.glb', name: 'MainPagoda', islandIndex: 0, position: [0, 8, 0], scale: 2 }
+ * 模型清单：后续在此追加。
+ *
+ * @example
+ * // 浮山楼阁
+ * { url: '/models/pagoda.glb', name: 'SkyPagoda', slotId: 'mountain-0-peak', scale: 1.2 }
+ * // 地面村庄
+ * { url: '/models/village.glb', name: 'EastVillage', slotId: 'village-0', scale: 1 }
  */
 export const MODEL_PLACEMENTS: ModelPlacement[] = []

@@ -4,28 +4,27 @@ import { disposeObject3D } from '../utils/dispose'
 import { createSeededRandom, range } from '../utils/random'
 import type { WorldModule } from '../types'
 
-const BLADE_COUNT = 14000
+const BLADE_COUNT = 8000
 
 export function createGrassField(): WorldModule {
   const group = new THREE.Group()
   group.name = 'GrassField'
 
-  const bladeGeo = new THREE.PlaneGeometry(0.3, 1.1, 1, 3)
-  bladeGeo.translate(0, 0.55, 0)
+  const bladeGeo = new THREE.PlaneGeometry(0.22, 0.85, 1, 2)
+  bladeGeo.translate(0, 0.42, 0)
 
   const bladeMat = new THREE.MeshStandardMaterial({
     color: Palette.grassMid,
-    roughness: 0.92,
+    roughness: 0.95,
     side: THREE.DoubleSide,
   })
 
   const mesh = new THREE.InstancedMesh(bladeGeo, bladeMat, BLADE_COUNT)
-  mesh.castShadow = true
   mesh.receiveShadow = true
 
   const dummy = new THREE.Object3D()
   const rand = createSeededRandom(3344)
-  const spread = 300
+  const spread = 260
   let placed = 0
 
   for (let attempt = 0; attempt < BLADE_COUNT * 4 && placed < BLADE_COUNT; attempt++) {
@@ -33,16 +32,12 @@ export function createGrassField(): WorldModule {
     const z = range(rand, -spread, spread)
     const dist = Math.sqrt(x * x + z * z)
 
-    if (dist < 25 || dist > spread) continue
+    if (dist < 35 || dist > spread) continue
 
-    dummy.position.set(x, 0.2 + range(rand, 0, 0.5), z)
-    dummy.rotation.set(
-      range(rand, -0.15, 0.15),
-      range(rand, 0, Math.PI * 2),
-      range(rand, -0.15, 0.15),
-    )
-    const s = 0.7 + range(rand, 0, 0.9)
-    dummy.scale.set(s, s * (0.9 + range(rand, 0, 0.4)), 1)
+    dummy.position.set(x, 0.15 + range(rand, 0, 0.25), z)
+    dummy.rotation.set(0, range(rand, 0, Math.PI * 2), 0)
+    const s = 0.6 + range(rand, 0, 0.5)
+    dummy.scale.set(s, s * (0.8 + range(rand, 0, 0.3)), 1)
     dummy.updateMatrix()
     mesh.setMatrixAt(placed, dummy.matrix)
     placed++

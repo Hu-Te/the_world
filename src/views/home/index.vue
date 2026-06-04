@@ -1,8 +1,10 @@
 <template>
   <div class="home">
-    <div ref="sceneRef" class="home-scene" aria-hidden="true" />
-    <div class="home-vignette" aria-hidden="true" />
-    <div class="home-grain" aria-hidden="true" />
+    <div ref="sceneRef" class="home-scene" data-scroll-lock-inset aria-hidden="true" />
+    <div class="home-vignette" data-scroll-lock-inset aria-hidden="true" />
+    <div class="home-grain" data-scroll-lock-inset aria-hidden="true" />
+
+    <HomeToolLayer ref="toolLayerRef" />
 
     <header class="nav" :class="{ 'nav--solid': scrolled }">
       <span class="nav-brand">
@@ -32,10 +34,16 @@
         </div>
       </div>
 
-      <a class="scroll-hint" href="#portals">
-        <span>探索入口</span>
-        <i aria-hidden="true">↓</i>
-      </a>
+      <div class="hero-foot">
+        <p class="privacy-banner" role="note">
+          <i class="privacy-banner-dot" aria-hidden="true" />
+          <span>{{ SITE.privacyNotice }}</span>
+        </p>
+        <a class="scroll-hint" href="#portals">
+          <span>探索入口</span>
+          <i aria-hidden="true">↓</i>
+        </a>
+      </div>
     </section>
 
     <section id="portals" class="portals">
@@ -100,7 +108,7 @@
     <footer class="footer">
       <span>© {{ year }} {{ SITE.name }}</span>
       <span class="footer-dot" />
-      <span>SIMULATION ONLINE</span>
+      <span>3D SIMULATION</span>
     </footer>
   </div>
 </template>
@@ -109,31 +117,44 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { mountHomeScene, type HomeSceneHandle } from '@/three'
 import { SITE } from '@/config/site'
+import HomeToolLayer from '@/components/home/HomeToolLayer.vue'
+import { rafThrottle } from '@/utils/schedule'
 
 const sceneRef = ref<HTMLDivElement>()
+const toolLayerRef = ref<InstanceType<typeof HomeToolLayer>>()
 let sceneHandle: HomeSceneHandle | null = null
+let unsubscribeToolSelect: (() => void) | null = null
 const year = new Date().getFullYear()
 const scrolled = ref(false)
+let scrollTick = window.scrollY > 24
 
-function onScroll() {
-  scrolled.value = window.scrollY > 24
-  const max = document.documentElement.scrollHeight - window.innerHeight
-  const progress = max > 0 ? window.scrollY / max : 0
-  sceneHandle?.setScrollProgress(progress)
+const applyScrollState = () => {
+  scrolled.value = scrollTick
 }
+
+const onScroll = rafThrottle(() => {
+  scrollTick = window.scrollY > 24
+  applyScrollState()
+})
 
 onMounted(() => {
   if (sceneRef.value) {
     sceneHandle = mountHomeScene(sceneRef.value)
+    unsubscribeToolSelect = sceneHandle.onToolSelect((toolId) => {
+      toolLayerRef.value?.activateTool(toolId)
+    })
   }
 
   window.addEventListener('scroll', onScroll, { passive: true })
-  onScroll()
+  scrollTick = window.scrollY > 24
+  applyScrollState()
 })
 
 onUnmounted(() => {
+  unsubscribeToolSelect?.()
   sceneHandle?.dispose()
   sceneHandle = null
+  onScroll.cancel()
   window.removeEventListener('scroll', onScroll)
 })
 </script>
@@ -142,19 +163,23 @@ onUnmounted(() => {
 .home {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   color: #dce8f0;
 }
 
 .home-scene {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: 3;
+  pointer-events: none;
 }
 
 .home-scene :deep(canvas) {
   display: block;
   width: 100% !important;
   height: 100% !important;
+  touch-action: pan-y;
+  pointer-events: auto;
 }
 
 .home-vignette {
@@ -163,9 +188,21 @@ onUnmounted(() => {
   z-index: 1;
   pointer-events: none;
   background:
-    linear-gradient(90deg, rgba(3, 6, 12, 0.88) 0%, rgba(3, 6, 12, 0.48) 40%, rgba(3, 6, 12, 0.08) 62%, rgba(3, 6, 12, 0.35) 100%),
-    radial-gradient(ellipse at 68% 42%, rgba(42, 136, 160, 0.18), transparent 48%),
-    linear-gradient(180deg, rgba(3, 6, 12, 0.35) 0%, rgba(3, 6, 12, 0.88) 100%);
+    linear-gradient(90deg, rgba(3, 6, 12, 0.82) 0%, rgba(3, 6, 12, 0.36) 38%, rgba(3, 6, 12, 0.04) 58%, rgba(3, 6, 12, 0.28) 100%),
+    radial-gradient(ellipse 620px 480px at 62% 42%, rgba(48, 148, 172, 0.32), transparent 58%),
+    radial-gradient(ellipse 340px 280px at 62% 42%, rgba(110, 88, 168, 0.14), transparent 45%),
+    linear-gradient(180deg, rgba(3, 6, 12, 0.28) 0%, rgba(3, 6, 12, 0.82) 100%);
+  /* 右下角留给工具箱，减弱暗角叠压 */
+  -webkit-mask-image: radial-gradient(
+    ellipse 440px 380px at 80% 88%,
+    rgba(0, 0, 0, 0.38) 0%,
+    rgba(0, 0, 0, 1) 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 440px 380px at 80% 88%,
+    rgba(0, 0, 0, 0.38) 0%,
+    rgba(0, 0, 0, 1) 100%
+  );
 }
 
 .home-grain {
@@ -173,7 +210,7 @@ onUnmounted(() => {
   inset: 0;
   z-index: 2;
   pointer-events: none;
-  opacity: 0.035;
+  opacity: 0.028;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
@@ -186,8 +223,13 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 2rem;
+  padding: max(1rem, env(safe-area-inset-top)) max(2rem, env(safe-area-inset-right)) 1rem
+    max(2rem, env(safe-area-inset-left));
   transition: background 0.3s, border-color 0.3s, backdrop-filter 0.3s;
+}
+
+:global(html.scroll-locked) .nav {
+  right: var(--scrollbar-width, 0px);
 }
 
 .nav--solid {
@@ -261,10 +303,20 @@ onUnmounted(() => {
   position: relative;
   z-index: 10;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 5.5rem 2rem 3rem;
+  padding: calc(5.5rem + env(safe-area-inset-top)) max(2rem, env(safe-area-inset-right)) 3rem
+    max(2rem, env(safe-area-inset-left));
+  pointer-events: none;
+}
+
+.hero-copy,
+.hero-actions,
+.hero-foot,
+.scroll-hint {
+  pointer-events: auto;
 }
 
 .hero-inner {
@@ -327,6 +379,8 @@ onUnmounted(() => {
   font-size: 0.875rem;
   letter-spacing: 0.04em;
   text-decoration: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition: transform 0.2s, background 0.2s, border-color 0.2s;
 }
 
@@ -429,11 +483,66 @@ onUnmounted(() => {
   color: #8ab0bc;
 }
 
-.scroll-hint {
+.hero-foot {
   position: absolute;
-  left: 50%;
-  bottom: 1.5rem;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  bottom: max(1.35rem, env(safe-area-inset-bottom));
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0 max(1.25rem, env(safe-area-inset-right)) 0 max(1.25rem, env(safe-area-inset-left));
+  pointer-events: none;
+}
+
+.privacy-banner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  max-width: min(36rem, 100%);
+  margin: 0;
+  padding: 0.72rem 1.25rem;
+  border-radius: 999px;
+  border: 1px solid rgba(90, 168, 184, 0.55);
+  background: rgba(6, 14, 24, 0.88);
+  backdrop-filter: blur(14px);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 0 24px rgba(74, 152, 168, 0.12);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  letter-spacing: 0.04em;
+  color: rgba(232, 244, 250, 0.95);
+  text-align: center;
+  animation: privacyIn 0.8s 0.35s ease both;
+}
+
+.privacy-banner-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #56b8cc;
+  box-shadow: 0 0 10px rgba(86, 184, 204, 0.65);
+}
+
+@keyframes privacyIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scroll-hint {
+  position: static;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -442,20 +551,20 @@ onUnmounted(() => {
   text-decoration: none;
   font-size: 0.6875rem;
   letter-spacing: 0.16em;
-  animation: float 2.4s ease-in-out infinite;
+  animation: floatY 2.4s ease-in-out infinite;
 }
 
 .scroll-hint i {
   font-style: normal;
 }
 
-@keyframes float {
+@keyframes floatY {
   0%,
   100% {
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
   }
   50% {
-    transform: translateX(-50%) translateY(6px);
+    transform: translateY(6px);
   }
 }
 
@@ -476,6 +585,7 @@ onUnmounted(() => {
   padding: 4rem 2rem;
   max-width: 1100px;
   margin: 0 auto;
+  pointer-events: none;
 }
 
 .section-head {
@@ -519,6 +629,7 @@ onUnmounted(() => {
   background: rgba(6, 12, 20, 0.62);
   backdrop-filter: blur(10px);
   overflow: hidden;
+  pointer-events: auto;
   transition: transform 0.25s, border-color 0.25s, background 0.25s;
 }
 
@@ -571,6 +682,7 @@ onUnmounted(() => {
   position: relative;
   z-index: 10;
   padding: 3rem 2rem 4rem;
+  pointer-events: none;
 }
 
 .glass-panel {
@@ -581,6 +693,7 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(6, 12, 20, 0.62);
   backdrop-filter: blur(12px);
+  pointer-events: auto;
 }
 
 .reveal {
@@ -653,6 +766,7 @@ onUnmounted(() => {
 .contact-links a {
   color: #8ab4c4;
   text-decoration: none;
+  pointer-events: auto;
 }
 
 .footer {
@@ -662,12 +776,14 @@ onUnmounted(() => {
   justify-content: center;
   align-items: center;
   gap: 0.75rem;
-  padding: 2rem;
+  padding: 2rem max(2rem, env(safe-area-inset-right)) calc(2rem + env(safe-area-inset-bottom))
+    max(2rem, env(safe-area-inset-left));
   font-size: 0.75rem;
   letter-spacing: 0.1em;
   color: rgba(220, 232, 240, 0.32);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(3, 6, 12, 0.88);
+  pointer-events: none;
 }
 
 .footer-dot {
@@ -695,7 +811,8 @@ onUnmounted(() => {
 
 @media (max-width: 640px) {
   .nav {
-    padding: 0.85rem 1.15rem;
+    padding: max(0.85rem, env(safe-area-inset-top)) max(1.15rem, env(safe-area-inset-right)) 0.85rem
+      max(1.15rem, env(safe-area-inset-left));
   }
 
   .nav-links {
@@ -707,13 +824,70 @@ onUnmounted(() => {
   }
 
   .hero {
-    padding: 5rem 1.15rem 3rem;
+    padding: calc(5rem + env(safe-area-inset-top)) max(1.15rem, env(safe-area-inset-right)) 3rem
+      max(1.15rem, env(safe-area-inset-left));
+  }
+
+  .hero-title {
+    font-size: clamp(2.25rem, 11vw, 3.25rem);
+  }
+
+  .hero-tagline {
+    font-size: 0.9375rem;
+  }
+
+  .hero-foot {
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    gap: 0.7rem;
+  }
+
+  .privacy-banner {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: 14px;
+    font-size: 0.8125rem;
+    letter-spacing: 0.02em;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn {
+    width: 100%;
+    min-height: 48px;
   }
 
   .portals,
   .panel-section {
-    padding-left: 1.15rem;
-    padding-right: 1.15rem;
+    padding-left: max(1.15rem, env(safe-area-inset-left));
+    padding-right: max(1.15rem, env(safe-area-inset-right));
+  }
+
+  .portal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .portal-card {
+    min-height: 48px;
+  }
+
+  .section-head h2 {
+    font-size: 1.45rem;
+  }
+
+  .home-vignette {
+    -webkit-mask-image: radial-gradient(
+      ellipse 320px 280px at 78% 90%,
+      rgba(0, 0, 0, 0.32) 0%,
+      rgba(0, 0, 0, 1) 100%
+    );
+    mask-image: radial-gradient(
+      ellipse 320px 280px at 78% 90%,
+      rgba(0, 0, 0, 0.32) 0%,
+      rgba(0, 0, 0, 1) 100%
+    );
   }
 }
 </style>

@@ -21,6 +21,8 @@ export interface LoadModelOptions {
   scale?: number | THREE.Vector3 | [number, number, number]
   castShadow?: boolean
   receiveShadow?: boolean
+  /** 默认 true；角色等需手动控制动画时设为 false */
+  autoPlay?: boolean
 }
 
 const loader = new GLTFLoader()
@@ -94,6 +96,7 @@ export function loadGltfModel(options: LoadModelOptions): Promise<LoadedModel> {
     name = url.split('/').pop() ?? 'model',
     castShadow = true,
     receiveShadow = true,
+    autoPlay = true,
   } = options
 
   return new Promise((resolve, reject) => {
@@ -118,7 +121,7 @@ export function loadGltfModel(options: LoadModelOptions): Promise<LoadedModel> {
         const mixer =
           gltf.animations.length > 0 ? new THREE.AnimationMixer(root) : null
 
-        if (mixer) {
+        if (mixer && autoPlay) {
           gltf.animations.forEach((clip) => mixer.clipAction(clip).play())
         }
 

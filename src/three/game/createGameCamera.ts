@@ -20,8 +20,8 @@ export function createGameCamera(
 
   let yaw = Math.PI * 0.25
   let pitch = 0.38
-  let distance = 24
-  const lookOffset = new THREE.Vector3(0, 2.4, 0)
+  let distance = 17
+  const lookOffset = new THREE.Vector3(0, 1.95, 0)
   const currentPos = new THREE.Vector3()
   const desiredPos = new THREE.Vector3()
   const target = new THREE.Vector3()
@@ -50,7 +50,7 @@ export function createGameCamera(
   }
 
   const zoom = (delta: number) => {
-    distance = THREE.MathUtils.clamp(distance + delta * 0.04, 14, 38)
+    distance = THREE.MathUtils.clamp(distance + delta * 0.04, 10, 32)
   }
 
   update(1)

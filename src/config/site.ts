@@ -1,10 +1,10 @@
 /** 个人站点信息（按需修改） */
 export const SITE = {
   name: '世界模拟',
-  title: '做 Web 与三维场景',
-  tagline: '程序化三维 · 实时渲染 · 交互模拟',
-  description:
-    '专注 Web 与程序化三维场景，正在构建一座可交互的模拟大世界。支持地形生成、模型挂点与实时探索。',
+  title: 'Web 三维场景',
+  tagline: '程序化建模 · 实时渲染 · 交互仿真',
+  description: '用浏览器做轻量三维仿真：探索场景、实用工具、即开即用。',
+  privacyNotice: '本站不收集、不缓存个人数据，请放心体验。',
   // email: 'hello@example.com',
   // github: 'https://github.com/Hu-Te/the_world',
   nav: [
@@ -14,42 +14,42 @@ export const SITE = {
   ],
   works: [
     {
-      title: '模拟大世界',
-      desc: '程序化生成的浮空地貌、地面聚落与写实地形，支持实时探索。',
+      title: '场景探索',
+      desc: '进入三维世界，自由漫游。',
       tags: [],
     },
     {
-      title: '模型接入',
-      desc: '预留挂点与模型注册表，支持场景资产按需替换与部署。',
+      title: '实用工具',
+      desc: '右下角工具箱，按需扩展。',
       tags: [],
     },
     {
-      title: '持续迭代中',
-      desc: '建筑细节、地面山脉、后期效果与性能优化。',
+      title: '持续更新',
+      desc: '功能逐步完善，保持简单可用。',
       tags: [],
     },
   ],
   portals: [
     {
       title: '交互模拟',
-      desc: '第三人称探索，接入节点、收集能量、完成主线任务。',
+      desc: '第三人称探索与小任务。',
       href: '/game',
-      label: '进入游戏',
-      code: 'SIM-01',
+      label: '进入',
+      code: '01',
     },
     {
       title: '沉浸世界',
-      desc: '全屏三维场景，自由漫游程序化地形与浮空地貌。',
+      desc: '全屏三维场景漫游。',
       href: '/world',
-      label: '进入世界',
-      code: 'WLD-02',
+      label: '进入',
+      code: '02',
     },
     {
       title: '你画我猜',
-      desc: '同屏派对：一人作画，其他人猜词，支持触控绘画。',
+      desc: '同屏派对，触控绘画。',
       href: '/draw',
-      label: '开始游戏',
-      code: 'DRW-03',
+      label: '进入',
+      code: '03',
     },
   ],
 } as const

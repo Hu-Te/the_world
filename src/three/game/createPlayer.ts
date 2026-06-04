@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { createStandardMaterial } from '../utils/materials'
+import { loadGltfModel } from '../assets/modelLoader'
 import { sampleGroundHeight } from '../terrain/sampleGroundHeight'
 
 export interface PlayerHandle {
@@ -18,84 +18,112 @@ const WORLD_LIMIT = 95
 const MAX_SPEED = 20
 const ACCEL = 38
 const DECEL = 52
+const PLAYER_GLB = '/models/player/nathan.glb'
+const TARGET_HEIGHT = 2.3
+/** 行走循环中手臂自然下垂的帧（秒），避免 stop() 回到 T-pose */
+const IDLE_POSE_TIME = 0.05
+/** 待机时上臂向身体收拢的角度（绕骨骼本地 Y 轴，左右同向） */
+const IDLE_ARM_INWARD_DEG = 42
 
-function addMesh(
-  parent: THREE.Object3D,
-  geometry: THREE.BufferGeometry,
-  material: THREE.Material,
-  x: number,
-  y: number,
-  z: number,
-  rx = 0,
-  ry = 0,
-  rz = 0,
-): THREE.Mesh {
-  const mesh = new THREE.Mesh(geometry, material)
-  mesh.position.set(x, y, z)
-  mesh.rotation.set(rx, ry, rz)
-  mesh.castShadow = true
-  mesh.receiveShadow = true
-  parent.add(mesh)
-  return mesh
+interface BoneCorrection {
+  bone: THREE.Bone
+  offset: THREE.Quaternion
 }
 
-/** 探索员角色：防护服、头盔、背包、能量环 */
+type IdlePose = Map<THREE.Bone, THREE.Quaternion>
+
+function findWalkClip(clips: THREE.AnimationClip[]): THREE.AnimationClip | null {
+  return (
+    clips.find((c) => /walk/i.test(c.name)) ??
+    clips.find((c) => /move/i.test(c.name)) ??
+    clips[0] ??
+    null
+  )
+}
+
+function fitModelToGround(root: THREE.Object3D, targetHeight: number): void {
+  const box = new THREE.Box3().setFromObject(root)
+  const size = box.getSize(new THREE.Vector3())
+  if (size.y <= 0) return
+
+  const scale = targetHeight / size.y
+  root.scale.setScalar(scale)
+
+  box.setFromObject(root)
+  root.position.y = -box.min.y
+}
+
+function buildIdleArmCorrections(root: THREE.Object3D): BoneCorrection[] {
+  const corrections: BoneCorrection[] = []
+  const inward = THREE.MathUtils.degToRad(IDLE_ARM_INWARD_DEG)
+  const axis = new THREE.Vector3(0, 1, 0)
+
+  root.traverse((obj) => {
+    if (!(obj instanceof THREE.Bone)) return
+    const name = obj.name.toLowerCase()
+    if (!name.includes('upperarm') || name.includes('twist')) return
+    if (!name.endsWith('_l') && !name.endsWith('_r')) return
+
+    corrections.push({
+      bone: obj,
+      offset: new THREE.Quaternion().setFromAxisAngle(axis, inward),
+    })
+  })
+
+  return corrections
+}
+
+function applyIdleArmCorrections(corrections: BoneCorrection[]): void {
+  for (const { bone, offset } of corrections) {
+    bone.quaternion.multiply(offset)
+  }
+}
+
+function captureBonePose(root: THREE.Object3D): IdlePose {
+  const pose: IdlePose = new Map()
+  root.traverse((obj) => {
+    if (obj instanceof THREE.Bone) {
+      pose.set(obj, obj.quaternion.clone())
+    }
+  })
+  return pose
+}
+
+function applyIdlePose(root: THREE.Object3D, pose: IdlePose): void {
+  for (const [bone, quat] of pose) {
+    bone.quaternion.copy(quat)
+  }
+  root.traverse((obj) => {
+    if (obj instanceof THREE.SkinnedMesh) {
+      obj.skeleton.update()
+    }
+  })
+}
+
+/** 第三人称探索角色（GLB + 行走动画，加载失败时无模型占位） */
 export function createPlayer(spawnX = 0, spawnZ = 18): PlayerHandle {
   const group = new THREE.Group()
   group.name = 'Player'
 
   const body = new THREE.Group()
-  body.name = 'Body'
-
-  const suitMat = createStandardMaterial({ color: 0x3a5068, roughness: 0.75, metalness: 0.15 })
-  const darkMat = createStandardMaterial({ color: 0x1a2838, roughness: 0.85 })
-  const visorMat = createStandardMaterial({
-    color: 0x88ccff,
-    roughness: 0.1,
-    metalness: 0.6,
-    emissive: 0x226688,
-    emissiveIntensity: 0.35,
-  })
-  const packMat = createStandardMaterial({ color: 0x2a3848, roughness: 0.8, metalness: 0.2 })
-
-  addMesh(body, new THREE.CylinderGeometry(0.5, 0.62, 1.35, 10), suitMat, 0, 0.85, 0)
-  addMesh(body, new THREE.BoxGeometry(0.52, 0.42, 0.36), suitMat, 0, 1.55, 0)
-  addMesh(body, new THREE.SphereGeometry(0.36, 14, 14), darkMat, 0, 2.05, 0)
-  addMesh(body, new THREE.BoxGeometry(0.44, 0.14, 0.22), visorMat, 0, 2.02, 0.22)
-
-  addMesh(body, new THREE.BoxGeometry(0.22, 0.55, 0.28), packMat, 0, 1.35, -0.38)
-  addMesh(body, new THREE.CylinderGeometry(0.04, 0.04, 0.35, 6), visorMat, 0.12, 1.75, -0.38, 0.3, 0, 0)
-
-  addMesh(body, new THREE.BoxGeometry(0.18, 0.55, 0.14), suitMat, -0.55, 1.2, 0, 0, 0, 0.2)
-  addMesh(body, new THREE.BoxGeometry(0.18, 0.55, 0.14), suitMat, 0.55, 1.2, 0, 0, 0, -0.2)
-
-  const aura = new THREE.Mesh(
-    new THREE.RingGeometry(0.8, 1.05, 32),
-    new THREE.MeshBasicMaterial({
-      color: 0x55aacc,
-      transparent: true,
-      opacity: 0.14,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-    }),
-  )
-  aura.rotation.x = -Math.PI / 2
-  aura.position.y = 0.06
+  body.name = 'Avatar'
 
   const energyCore = new THREE.Mesh(
-    new THREE.SphereGeometry(0.1, 12, 12),
+    new THREE.OctahedronGeometry(0.11, 0),
     new THREE.MeshStandardMaterial({
       color: 0x88ddff,
       emissive: 0x3399cc,
-      emissiveIntensity: 0.8,
+      emissiveIntensity: 0.9,
+      roughness: 0.2,
+      metalness: 0.6,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.92,
     }),
   )
-  energyCore.position.set(0.38, 1.45, 0.25)
+  energyCore.position.set(0.55, 1.85, 0.25)
   energyCore.visible = false
 
-  group.add(body, aura, energyCore)
+  group.add(body, energyCore)
 
   const position = new THREE.Vector3()
   let yaw = 0
@@ -103,6 +131,46 @@ export function createPlayer(spawnX = 0, spawnZ = 18): PlayerHandle {
   let velocityZ = 0
   let isMoving = false
   let energyVisible = false
+
+  let avatarUpdate: (delta: number) => void = () => {}
+  let walkAction: THREE.AnimationAction | null = null
+  let avatarDispose: (() => void) | null = null
+  let avatarLoaded = false
+  let idlePose: IdlePose | null = null
+  let avatarRoot: THREE.Object3D | null = null
+  let wasMoving = false
+
+  void loadGltfModel({
+    url: PLAYER_GLB,
+    name: 'Nathan',
+    autoPlay: false,
+  })
+    .then((model) => {
+      fitModelToGround(model.root, TARGET_HEIGHT)
+      body.add(model.root)
+      avatarRoot = model.root
+      avatarLoaded = true
+      avatarDispose = model.dispose
+
+      const clip = findWalkClip(model.animations)
+      if (model.mixer && clip) {
+        walkAction = model.mixer.clipAction(clip)
+        walkAction.setLoop(THREE.LoopRepeat, Infinity)
+        walkAction.play()
+        walkAction.time = IDLE_POSE_TIME
+        model.update(0)
+        applyIdleArmCorrections(buildIdleArmCorrections(model.root))
+        idlePose = captureBonePose(model.root)
+        walkAction.paused = true
+      }
+
+      avatarUpdate = (delta: number) => {
+        model.update(delta)
+      }
+    })
+    .catch((err) => {
+      console.warn('[player] GLB 加载失败，使用占位:', err)
+    })
 
   const syncGround = () => {
     position.y = sampleGroundHeight(position.x, position.z) + 0.05
@@ -142,20 +210,33 @@ export function createPlayer(spawnX = 0, spawnZ = 18): PlayerHandle {
     syncGround()
   }
 
-  const update = (elapsed: number, _delta: number) => {
-    const bob = isMoving ? Math.sin(elapsed * 14) * 0.06 : 0
-    const lean = isMoving ? 0.08 : 0
-    body.position.y = bob
-    body.rotation.x = THREE.MathUtils.lerp(body.rotation.x, lean, 0.12)
+  const update = (elapsed: number, delta: number) => {
+    const speed = Math.hypot(velocityX, velocityZ) / MAX_SPEED
 
-    const pulse = 0.18 + Math.sin(elapsed * 3) * 0.06
-    aura.scale.setScalar(1 + (isMoving ? Math.sin(elapsed * 10) * 0.05 : 0))
-    ;(aura.material as THREE.MeshBasicMaterial).opacity = isMoving ? pulse + 0.1 : pulse
+    if (isMoving) {
+      if (walkAction) {
+        if (!wasMoving) {
+          walkAction.time = IDLE_POSE_TIME
+        }
+        walkAction.paused = false
+        walkAction.timeScale = THREE.MathUtils.lerp(0.85, 1.35, speed)
+        if (!walkAction.isRunning()) walkAction.play()
+      }
+      avatarUpdate(delta)
+    } else if (avatarRoot && idlePose) {
+      if (walkAction) {
+        walkAction.paused = true
+        walkAction.timeScale = 0
+      }
+      applyIdlePose(avatarRoot, idlePose)
+    }
 
-    energyCore.visible = energyVisible
+    wasMoving = isMoving
+
+    energyCore.visible = energyVisible && avatarLoaded
     if (energyVisible) {
-      energyCore.position.y = 1.45 + Math.sin(elapsed * 4) * 0.08
-      energyCore.rotation.y = elapsed * 1.5
+      energyCore.position.y = 1.85 + Math.sin(elapsed * 4) * 0.08
+      energyCore.rotation.y = elapsed * 1.8
     }
   }
 
@@ -164,6 +245,7 @@ export function createPlayer(spawnX = 0, spawnZ = 18): PlayerHandle {
   }
 
   const dispose = () => {
+    avatarDispose?.()
     group.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
         obj.geometry.dispose()

@@ -1,3 +1,4 @@
+import { DRAW_SYNC_API } from '@/config/api'
 import type { DrawSyncMessage, DrawSyncState } from './types'
 
 export type DrawSyncMode = 'solo' | 'host' | 'guest'
@@ -16,15 +17,13 @@ export interface DrawSyncStatus {
   hostOnline: boolean
 }
 
-const API_BASE = (import.meta.env.VITE_DRAW_SYNC_URL as string | undefined) ?? '/api/draw'
-
 function randomCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000))
 }
 
 async function postState(roomId: string, state: DrawSyncState): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/${roomId}/state`, {
+    const res = await fetch(`${DRAW_SYNC_API}/${roomId}/state`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(state),
@@ -37,7 +36,7 @@ async function postState(roomId: string, state: DrawSyncState): Promise<boolean>
 
 async function postGuess(roomId: string, text: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/${roomId}/guess`, {
+    const res = await fetch(`${DRAW_SYNC_API}/${roomId}/guess`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
@@ -49,7 +48,7 @@ async function postGuess(roomId: string, text: string): Promise<boolean> {
 }
 
 async function fetchRoom(roomId: string, role: 'host' | 'guest') {
-  const res = await fetch(`${API_BASE}/${roomId}`, {
+  const res = await fetch(`${DRAW_SYNC_API}/${roomId}`, {
     headers: { 'X-Draw-Role': role },
     cache: 'no-store',
   })

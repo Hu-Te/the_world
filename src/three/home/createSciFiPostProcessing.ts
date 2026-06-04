@@ -10,6 +10,10 @@ export interface SciFiPostProcessing {
   dispose: () => void
 }
 
+export interface SciFiPostProcessingOptions {
+  mobile?: boolean
+}
+
 /** 科幻首页 Bloom 后期 */
 export function createSciFiPostProcessing(
   renderer: THREE.WebGLRenderer,
@@ -17,11 +21,18 @@ export function createSciFiPostProcessing(
   camera: THREE.Camera,
   width: number,
   height: number,
+  options: SciFiPostProcessingOptions = {},
 ): SciFiPostProcessing {
   const composer = new EffectComposer(renderer)
   composer.addPass(new RenderPass(scene, camera))
 
-  const bloom = new UnrealBloomPass(new THREE.Vector2(width, height), 0.44, 0.42, 0.38)
+  const mobile = options.mobile ?? false
+  const bloom = new UnrealBloomPass(
+    new THREE.Vector2(width, height),
+    mobile ? 0.26 : 0.36,
+    mobile ? 0.38 : 0.42,
+    mobile ? 0.54 : 0.5,
+  )
   composer.addPass(bloom)
   composer.addPass(new OutputPass())
 

@@ -14,7 +14,8 @@ export type { MountWorldOptions } from './world/mountWorld'
 export { mountGame } from './game/mountGame'
 
 export { mountHomeScene } from './home/mountHomeScene'
-export type { HomeSceneHandle } from './home/mountHomeScene'
+export type { HomeSceneHandle, HomeToolId } from './home/mountHomeScene'
+export { HOME_TOOL_LABELS, HOME_ACTIVE_TOOLS } from './home/homeToolIds'
 
 export type { WorldHandle, WorldModule, Disposer } from './types'
 export type { GameHandle } from '@/game/types'

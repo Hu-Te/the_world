@@ -27,11 +27,8 @@ const router = createRouter({
             component: () => import('@/views/_legacy/home-full.vue'),
         },
     ],
-    scrollBehavior(to) {
-        if (to.hash) {
-            return { el: to.hash, behavior: 'smooth' }
-        }
-        return { top: 0 }
+    scrollBehavior() {
+        return { top: 0, left: 0 }
     },
 })
 

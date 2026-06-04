@@ -238,5 +238,6 @@ gulp.task('prepare-remote', prepareRemote)
 gulp.task('upload-dev', uploadDev)
 gulp.task('sync-release', syncRelease)
 gulp.task('deploy-draw-sync', deployDrawSync)
-gulp.task('deploy', gulp.series('build-only', 'prepare-remote', 'upload-dev', 'sync-release', 'deploy-draw-sync'))
+/** 生产默认：仅静态前端（API 由 Java 提供，见 docs/java-backend-deploy.md） */
+gulp.task('deploy', gulp.series('build-only', 'prepare-remote', 'upload-dev', 'sync-release'))
 gulp.task('default', gulp.series('deploy'))

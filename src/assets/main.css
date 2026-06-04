@@ -6,6 +6,17 @@
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scrollbar-gutter: stable;
+}
+
+html.scroll-locked body {
+  padding-right: var(--scrollbar-width, 0px);
+}
+
+html.scroll-locked [data-scroll-lock-inset] {
+  right: var(--scrollbar-width, 0px);
 }
 
 body {
@@ -20,6 +31,15 @@ body {
   -webkit-font-smoothing: antialiased;
   background: #0f141e;
   color: #f5f0e8;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+a,
+button,
+.btn,
+.portal-card {
+  touch-action: manipulation;
 }
 
 a {

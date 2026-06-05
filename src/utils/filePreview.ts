@@ -9,8 +9,12 @@ export interface FilePreviewState {
   mime: string
   kind: FilePreviewKind
   url: string
-  /** Cloud tile map id after upload-proxy (DWG/DXF) */
+  /** VJMAP fileid after upload-proxy */
   cloudFileId?: string
+  /** VJMAP suggested mapid for WebGL tiles */
+  cloudMapId?: string
+  /** Original upload filename returned by cloud gateway */
+  cloudUploadName?: string
   /** @deprecated Legacy SVG preview URL */
   svgUrl?: string
   text?: string
@@ -133,10 +137,12 @@ export async function buildFilePreview(file: File): Promise<FilePreviewState> {
   }
 
   if (kind === 'cad') {
-    const { fileId } = await uploadCadCloudProxy(file)
+    const { fileId, mapId, uploadName } = await uploadCadCloudProxy(file)
     return {
       ...base,
       cloudFileId: fileId,
+      cloudMapId: mapId ?? fileId,
+      cloudUploadName: uploadName ?? file.name,
       mime: 'application/vnd.nexus.cad-cloud',
     }
   }

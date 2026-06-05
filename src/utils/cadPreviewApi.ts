@@ -9,6 +9,8 @@ interface ProblemDetail {
 
 export interface CadUploadProxyResult {
   fileId: string
+  mapId?: string
+  uploadName?: string
   gatewayStatus?: string
 }
 
@@ -28,12 +30,22 @@ export async function uploadCadCloudProxy(file: File): Promise<CadUploadProxyRes
     throw new FilePreviewError(await parseCadPreviewError(res))
   }
 
-  const data = (await res.json()) as { fileId?: string; gatewayStatus?: string }
+  const data = (await res.json()) as {
+    fileId?: string
+    mapId?: string
+    uploadName?: string
+    gatewayStatus?: string
+  }
   if (!data.fileId) {
     throw new FilePreviewError('Cloud gateway response missing fileId')
   }
 
-  return { fileId: data.fileId, gatewayStatus: data.gatewayStatus }
+  return {
+    fileId: data.fileId,
+    mapId: data.mapId ?? data.fileId,
+    uploadName: data.uploadName,
+    gatewayStatus: data.gatewayStatus,
+  }
 }
 
 /**

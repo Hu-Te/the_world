@@ -5,6 +5,9 @@ import HomeFilePreview from '@/components/home/HomeFilePreview.vue'
 
 const {
   toast,
+  previewLoading,
+  previewLoadingHint,
+  previewLoadingElapsed,
   zipExtractRef,
   filePreviewRef,
   previewOpen,
@@ -44,6 +47,24 @@ defineExpose({ activateTool })
 
   <Transition name="toast">
     <p v-if="toast" class="tool-toast" role="status">{{ toast }}</p>
+  </Transition>
+
+  <Transition name="loading">
+    <div
+      v-if="previewLoading"
+      class="preview-loading"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div class="preview-loading-card">
+        <div class="preview-loading-spinner" aria-hidden="true" />
+        <p class="preview-loading-title">{{ previewLoadingHint }}</p>
+        <p v-if="previewLoadingElapsed >= 8" class="preview-loading-meta">
+          已等待 {{ previewLoadingElapsed }} 秒 · 请勿关闭页面
+        </p>
+      </div>
+    </div>
   </Transition>
 </template>
 
@@ -97,5 +118,67 @@ defineExpose({ activateTool })
 .toast-leave-to {
   opacity: 0;
   transform: translateY(8px);
+}
+
+.preview-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(3, 8, 14, 0.62);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.preview-loading-card {
+  max-width: min(420px, 100%);
+  padding: 1.35rem 1.5rem;
+  border-radius: 16px;
+  border: 1px solid rgba(136, 204, 238, 0.28);
+  background: rgba(8, 16, 28, 0.94);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+  text-align: center;
+}
+
+.preview-loading-spinner {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 1rem;
+  border: 2px solid rgba(136, 204, 238, 0.18);
+  border-top-color: #6ec8e8;
+  border-radius: 50%;
+  animation: preview-spin 0.85s linear infinite;
+}
+
+@keyframes preview-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.preview-loading-title {
+  margin: 0;
+  color: rgba(228, 240, 248, 0.92);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.preview-loading-meta {
+  margin: 0.65rem 0 0;
+  color: rgba(180, 210, 224, 0.62);
+  font-size: 0.75rem;
+}
+
+.loading-enter-active,
+.loading-leave-active {
+  transition: opacity 0.25s ease;
+}
+
+.loading-enter-from,
+.loading-leave-to {
+  opacity: 0;
 }
 </style>

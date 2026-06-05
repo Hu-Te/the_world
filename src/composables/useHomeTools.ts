@@ -9,11 +9,16 @@ import {
   revokeFilePreview,
   type FilePreviewState,
 } from '@/utils/filePreview'
+import { CAD_UPLOAD_HINTS, startSlowLoadingHints } from '@/utils/slowLoadingHint'
 
 export function useHomeTools() {
   const router = useRouter()
   const toast = ref('')
+  const previewLoading = ref(false)
+  const previewLoadingHint = ref('')
+  const previewLoadingElapsed = ref(0)
   let toastTimer = 0
+  let stopPreviewHints: (() => void) | null = null
 
   const zipCompressRef = ref<HTMLInputElement>()
   const zipExtractRef = ref<HTMLInputElement>()
@@ -27,6 +32,26 @@ export function useHomeTools() {
     toastTimer = window.setTimeout(() => {
       toast.value = ''
     }, 2800)
+  }
+
+  function beginPreviewLoading(isCad: boolean) {
+    stopPreviewHints?.()
+    previewLoading.value = true
+    previewLoadingHint.value = isCad ? CAD_UPLOAD_HINTS[0]!.text : '正在加载预览…'
+    previewLoadingElapsed.value = 0
+    if (!isCad) return
+    stopPreviewHints = startSlowLoadingHints(CAD_UPLOAD_HINTS, (text, elapsedSec) => {
+      previewLoadingHint.value = text
+      previewLoadingElapsed.value = elapsedSec
+    })
+  }
+
+  function endPreviewLoading() {
+    stopPreviewHints?.()
+    stopPreviewHints = null
+    previewLoading.value = false
+    previewLoadingHint.value = ''
+    previewLoadingElapsed.value = 0
   }
 
   function downloadBlob(blob: Blob, filename: string) {
@@ -97,15 +122,14 @@ export function useHomeTools() {
 
     closePreview()
     const isCad = /\.(dwg|dxf)$/i.test(file.name)
-    showToast(isCad ? '正在上传图纸至云端切片服务，大文件可能需要较长时间…' : '正在加载预览…')
+    beginPreviewLoading(isCad)
     try {
       previewState.value = await buildFilePreview(file)
       previewOpen.value = true
-      toast.value = ''
-      window.clearTimeout(toastTimer)
     } catch (e) {
       showToast(e instanceof FilePreviewError ? e.message : '无法预览该文件')
     } finally {
+      endPreviewLoading()
       input.value = ''
     }
   }
@@ -169,6 +193,9 @@ export function useHomeTools() {
 
   return {
     toast,
+    previewLoading,
+    previewLoadingHint,
+    previewLoadingElapsed,
     zipCompressRef,
     zipExtractRef,
     filePreviewRef,

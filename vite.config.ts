@@ -24,12 +24,26 @@ export default defineConfig(({ mode }) => {
     },
   }
 
+  /** vjmap 包未附带 .map 文件，去掉 sourceMappingURL 避免 dev 启动告警 */
+  const stripVjmapSourceMap: Plugin = {
+    name: 'strip-vjmap-sourcemap',
+    transform(code, id) {
+      if (id.includes('node_modules/vjmap') && id.endsWith('.js')) {
+        return {
+          code: code.replace(/\n?\/\/# sourceMappingURL=.*$/g, ''),
+          map: null,
+        }
+      }
+    },
+  }
+
   return {
   plugins: [
     basicSsl(),
     vue(),
     vueDevTools(),
     logApiProxy,
+    stripVjmapSourceMap,
   ],
   resolve: {
     alias: {
@@ -48,6 +62,7 @@ export default defineConfig(({ mode }) => {
       '@mlightcad/libredwg-converter',
       'lodash-es',
       '@velipso/polybool',
+      'vjmap',
     ],
   },
   server: {

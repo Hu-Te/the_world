@@ -70,6 +70,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
             v-else-if="state.kind === 'cad'"
             class="preview-cad-viewer"
             :initial-file-id="state.cloudFileId"
+            :initial-map-id="state.cloudMapId"
+            :initial-upload-name="state.cloudUploadName"
             :initial-file-name="state.name"
           />
 
@@ -203,8 +205,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
   background: rgba(0, 0, 0, 0.22);
 }
 
-.preview-body:has(.preview-cad-svg) {
+.preview-body:has(.preview-cad-viewer) {
   align-items: stretch;
+  justify-content: stretch;
   padding: 0.75rem;
 }
 

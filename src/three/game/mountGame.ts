@@ -27,16 +27,22 @@ export function mountGame(container: HTMLElement): GameHandle {
   const height = Math.max(container.clientHeight, 1)
 
   const scene = createScene()
-  const renderer = createRenderer({ width, height })
+  const renderer = createRenderer({
+    width,
+    height,
+    pixelRatio: Math.min(window.devicePixelRatio, 1.5),
+  })
   renderer.toneMappingExposure = 0.9
   container.appendChild(renderer.domElement)
 
   const pmremGenerator = new THREE.PMREMGenerator(renderer)
   const environmentMap = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture
   scene.environment = environmentMap
-  scene.environmentIntensity = 0.9
+  scene.environmentIntensity = 0.85
 
-  const player = createPlayer()
+  const player = createPlayer({
+    onAvatarState: () => emit(),
+  })
   scene.add(player.group)
 
   const markers = createVillageMarkers(NODE_POIS)
@@ -45,7 +51,7 @@ export function mountGame(container: HTMLElement): GameHandle {
   const gameCamera = createGameCamera(width, height, player)
   const postProcessing = createGamePostProcessing(renderer, scene, gameCamera.camera, width, height)
 
-  const world = createSimWorld(scene)
+  const world = createSimWorld(scene, { performance: 'lite' })
 
   const keys = new Set<string>()
   let pointerDown = false
@@ -83,6 +89,7 @@ export function mountGame(container: HTMLElement): GameHandle {
       name: poi.name,
       visited: visited.has(poi.id),
     })),
+    avatarState: player.avatarState,
   })
 
   const emit = () => {

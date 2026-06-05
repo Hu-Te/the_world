@@ -2,6 +2,7 @@
 import { useHomeTools } from '@/composables/useHomeTools'
 import { FILE_PREVIEW_ACCEPT } from '@/utils/filePreview'
 import HomeFilePreview from '@/components/home/HomeFilePreview.vue'
+import HomeLanScanModal from '@/components/home/HomeLanScanModal.vue'
 
 const {
   toast,
@@ -12,9 +13,11 @@ const {
   filePreviewRef,
   previewOpen,
   previewState,
+  lanScanOpen,
   onZipExtract,
   onFilePreview,
   closePreview,
+  closeLanScan,
   openFilePreviewPicker,
   activateTool,
 } = useHomeTools()
@@ -44,6 +47,8 @@ defineExpose({ activateTool })
     @close="closePreview"
     @replace="openFilePreviewPicker"
   />
+
+  <HomeLanScanModal v-if="lanScanOpen" @close="closeLanScan" />
 
   <Transition name="toast">
     <p v-if="toast" class="tool-toast" role="status">{{ toast }}</p>

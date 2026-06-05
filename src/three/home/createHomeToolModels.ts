@@ -157,6 +157,35 @@ function buildToolModel(
       group.add(page, ...lines, lens, handle)
       break
     }
+    case 'lan-scan': {
+      mat = baseMat(0x4a8898, 0x1a4050, envMap)
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.06, 6), mat)
+      hub.rotation.x = Math.PI / 2
+      hub.position.y = 0.18
+
+      const spokeMat = baseMat(0x5a98a8, 0x204858, envMap)
+      const spokes = [0, Math.PI / 2, Math.PI, (Math.PI * 3) / 2].map((angle) => {
+        const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.025, 0.025), spokeMat)
+        spoke.position.set(Math.cos(angle) * 0.2, 0.18, Math.sin(angle) * 0.2)
+        spoke.rotation.y = -angle
+        return spoke
+      })
+
+      const nodeMat = baseMat(0x6aa8b8, 0x2a6878, envMap)
+      const nodes = [0.25, 0.2, 0.22, 0.18].map((dist, i) => {
+        const angle = (i / 4) * Math.PI * 2 + 0.4
+        const node = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 10), nodeMat)
+        node.position.set(Math.cos(angle) * dist, 0.18, Math.sin(angle) * dist)
+        return node
+      })
+
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.012, 8, 32), spokeMat)
+      ring.rotation.x = Math.PI / 2
+      ring.position.y = 0.18
+
+      group.add(hub, ring, ...spokes, ...nodes)
+      break
+    }
     case 'timestamp': {
       mat = baseMat(0x588890, 0x183840, envMap)
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.028, 10, 32), mat)

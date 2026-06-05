@@ -2,6 +2,7 @@ export type HomeToolId =
   | 'zip-compress'
   | 'zip-extract'
   | 'file-preview'
+  | 'lan-scan'
   | 'timestamp'
   | 'uuid'
   | 'color'
@@ -14,6 +15,7 @@ export const HOME_TOOL_LABELS: Record<HomeToolId, string> = {
   'zip-compress': '压缩打包',
   'zip-extract': '解压 ZIP',
   'file-preview': '文件预览',
+  'lan-scan': '内网扫描',
   timestamp: '时间戳',
   uuid: 'UUID',
   color: '随机色',
@@ -23,4 +25,4 @@ export const HOME_TOOL_LABELS: Record<HomeToolId, string> = {
   'goto-draw': '你画我猜',
 }
 
-export const HOME_ACTIVE_TOOLS: HomeToolId[] = ['zip-extract', 'file-preview']
+export const HOME_ACTIVE_TOOLS: HomeToolId[] = ['zip-extract', 'file-preview', 'lan-scan']

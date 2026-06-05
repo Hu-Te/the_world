@@ -20,6 +20,8 @@ import { WORLD_CONFIG } from './worldConfig'
 export interface CreateWorldOptions {
   /** GLB/GLTF 模型清单，默认读取 MODEL_PLACEMENTS */
   modelPlacements?: ModelPlacement[]
+  /** 游戏模式：降低草地/阴影开销 */
+  performance?: 'default' | 'lite'
 }
 
 export interface SimWorld extends WorldModule {
@@ -48,15 +50,17 @@ export function createSimWorld(
     if (module.update) updaters.push(module.update)
   }
 
+  const lite = options.performance === 'lite'
+
   register(createSky())
-  register(createLighting())
+  register(createLighting(lite ? 2048 : 4096))
   register(createGround())
 
   const groundMountains = createGroundMountains()
   register(groundMountains)
 
   if (WORLD_CONFIG.grassField) {
-    register(createGrassField())
+    register(createGrassField(lite ? 4200 : 8000))
   }
 
   const fog = createFog()
@@ -65,7 +69,7 @@ export function createSimWorld(
   const floatingMountains = createFloatingIslands()
   register(floatingMountains)
 
-  if (WORLD_CONFIG.clouds) {
+  if (WORLD_CONFIG.clouds && !lite) {
     register(createCloudMist())
   }
 

@@ -19,5 +19,5 @@ export function getSyncTier(energy: number): string {
   if (energy >= 100) return '深度同步'
   if (energy >= 60) return '稳定在线'
   if (energy >= 30) return '部分同步'
-  return '离线模式'
+  return '待接入'
 }

@@ -20,3 +20,8 @@ export const DRAW_SYNC_API =
 export const CAD_PREVIEW_API =
   (import.meta.env.VITE_CAD_PREVIEW_URL as string | undefined)?.replace(/\/$/, '') ||
   apiPath('/api/v1/cad')
+
+/** Optional server-side LAN scan (GET /api/v1/network/deep-scan) */
+export const NETWORK_SCAN_API =
+  (import.meta.env.VITE_NETWORK_SCAN_URL as string | undefined)?.replace(/\/$/, '') ||
+  apiPath('/api/v1/network')

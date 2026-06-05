@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_API_ORIGIN?: string
   readonly VITE_DRAW_SYNC_URL?: string
   readonly VITE_CAD_PREVIEW_URL?: string
+  /** Bearer token for /api/v1/cad and /api/v1/network (prod build) */
+  readonly VITE_APP_API_TOKEN?: string
 }
 
 interface ImportMeta {

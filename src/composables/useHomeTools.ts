@@ -25,6 +25,7 @@ export function useHomeTools() {
   const filePreviewRef = ref<HTMLInputElement>()
   const previewOpen = ref(false)
   const previewState = ref<FilePreviewState | null>(null)
+  const lanScanOpen = ref(false)
 
   function showToast(msg: string) {
     toast.value = msg
@@ -70,6 +71,14 @@ export function useHomeTools() {
     revokeFilePreview(previewState.value)
     previewState.value = null
     previewOpen.value = false
+  }
+
+  function openLanScan() {
+    lanScanOpen.value = true
+  }
+
+  function closeLanScan() {
+    lanScanOpen.value = false
   }
 
   async function onZipCompress(e: Event) {
@@ -158,6 +167,9 @@ export function useHomeTools() {
       case 'file-preview':
         openFilePreviewPicker()
         break
+      case 'lan-scan':
+        openLanScan()
+        break
       case 'timestamp': {
         const sec = Math.floor(Date.now() / 1000)
         const readable = new Date(sec * 1000).toLocaleString('zh-CN')
@@ -201,10 +213,12 @@ export function useHomeTools() {
     filePreviewRef,
     previewOpen,
     previewState,
+    lanScanOpen,
     onZipCompress,
     onZipExtract,
     onFilePreview,
     closePreview,
+    closeLanScan,
     openFilePreviewPicker,
     activateTool,
     showToast,

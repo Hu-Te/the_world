@@ -11,6 +11,12 @@
           <div class="stats-body">
             <p class="hud-title">操作员</p>
             <p class="realm">{{ state.tier }}</p>
+            <p v-if="state.avatarState === 'loading'" class="avatar-status avatar-status--loading">
+              角色模型加载中…
+            </p>
+            <p v-else-if="state.avatarState === 'fallback'" class="avatar-status avatar-status--fallback">
+              使用简化角色（模型加载失败）
+            </p>
             <div class="qi-bar">
               <i :style="{ width: `${(state.energy / state.maxEnergy) * 100}%` }" />
             </div>
@@ -188,6 +194,20 @@ onUnmounted(() => {
   font-size: 1rem;
   font-weight: 600;
   color: #f5f0e8;
+}
+
+.avatar-status {
+  margin: 0 0 0.35rem;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+}
+
+.avatar-status--loading {
+  color: rgba(136, 204, 238, 0.82);
+}
+
+.avatar-status--fallback {
+  color: rgba(255, 196, 120, 0.78);
 }
 
 .qi-bar {

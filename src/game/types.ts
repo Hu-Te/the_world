@@ -26,6 +26,8 @@ export interface GameSnapshot {
   playerZ: number
   cameraYaw: number
   nodes: NodeQuestItem[]
+  /** loading=GLB 下载中, ready=已加载, fallback=使用占位模型 */
+  avatarState: 'loading' | 'ready' | 'fallback'
 }
 
 export interface GameHandle {

@@ -2,7 +2,7 @@ import { ref, onScopeDispose } from 'vue'
 import type { GameSnapshot } from './types'
 
 const defaultSnapshot: GameSnapshot = {
-  tier: '离线模式',
+  tier: '待接入',
   energy: 0,
   maxEnergy: 100,
   questProgress: 0,
@@ -16,6 +16,7 @@ const defaultSnapshot: GameSnapshot = {
   playerZ: 0,
   cameraYaw: 0,
   nodes: [],
+  avatarState: 'loading',
 }
 
 export function bindGameState(getHandle: () => import('./types').GameHandle | null) {

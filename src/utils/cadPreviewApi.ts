@@ -1,4 +1,5 @@
 import { CAD_PREVIEW_API } from '@/config/api'
+import { appApiFetch } from '@/utils/apiAuth'
 import { FilePreviewError } from '@/utils/filePreview'
 
 interface ProblemDetail {
@@ -21,7 +22,7 @@ export async function uploadCadCloudProxy(file: File): Promise<CadUploadProxyRes
   const form = new FormData()
   form.append('file', file, file.name)
 
-  const res = await fetch(`${CAD_PREVIEW_API}/upload-proxy`, {
+  const res = await appApiFetch(`${CAD_PREVIEW_API}/upload-proxy`, {
     method: 'POST',
     body: form,
   })
@@ -55,7 +56,7 @@ export async function fetchCadSvgPreview(file: File): Promise<Blob> {
   const form = new FormData()
   form.append('file', file, file.name)
 
-  const res = await fetch(`${CAD_PREVIEW_API}/preview-large`, {
+  const res = await appApiFetch(`${CAD_PREVIEW_API}/preview-large`, {
     method: 'POST',
     body: form,
   })

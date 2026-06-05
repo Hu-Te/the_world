@@ -3,7 +3,7 @@ import { Palette } from '../utils/colors'
 import { disposeObject3D } from '../utils/dispose'
 import type { WorldModule } from '../types'
 
-export function createLighting(): WorldModule {
+export function createLighting(shadowMapSize = 4096): WorldModule {
   const group = new THREE.Group()
   group.name = 'Lighting'
 
@@ -15,7 +15,7 @@ export function createLighting(): WorldModule {
   const sun = new THREE.DirectionalLight(0xfff9f2, 2.8)
   sun.position.set(140, 180, 90)
   sun.castShadow = true
-  sun.shadow.mapSize.set(4096, 4096)
+  sun.shadow.mapSize.set(shadowMapSize, shadowMapSize)
   sun.shadow.camera.near = 20
   sun.shadow.camera.far = 600
   sun.shadow.camera.left = -200

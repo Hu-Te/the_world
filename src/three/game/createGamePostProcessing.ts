@@ -21,7 +21,7 @@ export function createGamePostProcessing(
   const composer = new EffectComposer(renderer)
   composer.addPass(new RenderPass(scene, camera))
 
-  const bloom = new UnrealBloomPass(new THREE.Vector2(width, height), 0.18, 0.25, 0.88)
+  const bloom = new UnrealBloomPass(new THREE.Vector2(width, height), 0.12, 0.22, 0.92)
   composer.addPass(bloom)
   composer.addPass(new OutputPass())
 

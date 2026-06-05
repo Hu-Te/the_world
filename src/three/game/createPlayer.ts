@@ -1,24 +1,36 @@
 import * as THREE from 'three'
 import { loadGltfModel } from '../assets/modelLoader'
 import { sampleGroundHeight } from '../terrain/sampleGroundHeight'
+import { createPlaceholderAvatar } from './createPlaceholderAvatar'
+import { resolvePublicUrl } from '@/utils/publicUrl'
+
+export type AvatarLoadState = 'loading' | 'ready' | 'fallback'
 
 export interface PlayerHandle {
   group: THREE.Group
   position: THREE.Vector3
   yaw: number
   isMoving: boolean
+  avatarState: AvatarLoadState
   setPosition: (x: number, z: number) => void
   move: (dx: number, dz: number, delta: number) => void
   update: (elapsed: number, delta: number) => void
   setEnergyVisible: (visible: boolean) => void
+  onAvatarStateChange: (listener: (state: AvatarLoadState) => void) => () => void
   dispose: () => void
+}
+
+export interface CreatePlayerOptions {
+  spawnX?: number
+  spawnZ?: number
+  onAvatarState?: (state: AvatarLoadState) => void
 }
 
 const WORLD_LIMIT = 95
 const MAX_SPEED = 20
 const ACCEL = 38
 const DECEL = 52
-const PLAYER_GLB = '/models/player/nathan.glb'
+const PLAYER_GLB = resolvePublicUrl('models/player/nathan.glb')
 const TARGET_HEIGHT = 2.3
 /** 行走循环中手臂自然下垂的帧（秒），避免 stop() 回到 T-pose */
 const IDLE_POSE_TIME = 0.05
@@ -100,13 +112,28 @@ function applyIdlePose(root: THREE.Object3D, pose: IdlePose): void {
   })
 }
 
-/** 第三人称探索角色（GLB + 行走动画，加载失败时无模型占位） */
-export function createPlayer(spawnX = 0, spawnZ = 18): PlayerHandle {
+function disposeObject(root: THREE.Object3D): void {
+  root.traverse((obj) => {
+    if (obj instanceof THREE.Mesh) {
+      obj.geometry.dispose()
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
+      mats.forEach((m) => m.dispose())
+    }
+  })
+}
+
+/** 第三人称探索角色（GLB + 行走动画，加载失败时显示占位模型） */
+export function createPlayer(options: CreatePlayerOptions = {}): PlayerHandle {
+  const { spawnX = 0, spawnZ = 18, onAvatarState } = options
+
   const group = new THREE.Group()
   group.name = 'Player'
 
   const body = new THREE.Group()
   body.name = 'Avatar'
+
+  const placeholder = createPlaceholderAvatar()
+  body.add(placeholder)
 
   const energyCore = new THREE.Mesh(
     new THREE.OctahedronGeometry(0.11, 0),
@@ -136,21 +163,44 @@ export function createPlayer(spawnX = 0, spawnZ = 18): PlayerHandle {
   let walkAction: THREE.AnimationAction | null = null
   let avatarDispose: (() => void) | null = null
   let avatarLoaded = false
+  let placeholderActive = true
+  let avatarState: AvatarLoadState = 'loading'
   let idlePose: IdlePose | null = null
   let avatarRoot: THREE.Object3D | null = null
   let wasMoving = false
 
-  void loadGltfModel({
-    url: PLAYER_GLB,
-    name: 'Nathan',
-    autoPlay: false,
-  })
-    .then((model) => {
+  const stateListeners = new Set<(state: AvatarLoadState) => void>()
+
+  const setAvatarState = (next: AvatarLoadState) => {
+    if (avatarState === next) return
+    avatarState = next
+    stateListeners.forEach((fn) => fn(next))
+    onAvatarState?.(next)
+  }
+
+  void (async () => {
+    try {
+      const probe = await fetch(PLAYER_GLB, { method: 'HEAD' })
+      if (!probe.ok) {
+        throw new Error(`模型资源不可用 (HTTP ${probe.status})`)
+      }
+
+      const model = await loadGltfModel({
+        url: PLAYER_GLB,
+        name: 'Nathan',
+        autoPlay: false,
+      })
+
+      body.remove(placeholder)
+      disposeObject(placeholder)
+      placeholderActive = false
+
       fitModelToGround(model.root, TARGET_HEIGHT)
       body.add(model.root)
       avatarRoot = model.root
       avatarLoaded = true
       avatarDispose = model.dispose
+      setAvatarState('ready')
 
       const clip = findWalkClip(model.animations)
       if (model.mixer && clip) {
@@ -167,10 +217,11 @@ export function createPlayer(spawnX = 0, spawnZ = 18): PlayerHandle {
       avatarUpdate = (delta: number) => {
         model.update(delta)
       }
-    })
-    .catch((err) => {
-      console.warn('[player] GLB 加载失败，使用占位:', err)
-    })
+    } catch (err) {
+      console.warn('[player] GLB 加载失败，使用占位模型:', err)
+      setAvatarState('fallback')
+    }
+  })()
 
   const syncGround = () => {
     position.y = sampleGroundHeight(position.x, position.z) + 0.05
@@ -213,6 +264,10 @@ export function createPlayer(spawnX = 0, spawnZ = 18): PlayerHandle {
   const update = (elapsed: number, delta: number) => {
     const speed = Math.hypot(velocityX, velocityZ) / MAX_SPEED
 
+    if (placeholderActive && isMoving) {
+      placeholder.rotation.y = Math.sin(elapsed * 10) * 0.06
+    }
+
     if (isMoving) {
       if (walkAction) {
         if (!wasMoving) {
@@ -244,8 +299,15 @@ export function createPlayer(spawnX = 0, spawnZ = 18): PlayerHandle {
     energyVisible = visible
   }
 
+  const onAvatarStateChange = (listener: (state: AvatarLoadState) => void) => {
+    stateListeners.add(listener)
+    listener(avatarState)
+    return () => stateListeners.delete(listener)
+  }
+
   const dispose = () => {
     avatarDispose?.()
+    if (placeholderActive) disposeObject(placeholder)
     group.traverse((obj) => {
       if (obj instanceof THREE.Mesh) {
         obj.geometry.dispose()
@@ -264,10 +326,14 @@ export function createPlayer(spawnX = 0, spawnZ = 18): PlayerHandle {
     get isMoving() {
       return isMoving
     },
+    get avatarState() {
+      return avatarState
+    },
     setPosition,
     move,
     update,
     dispose,
     setEnergyVisible,
+    onAvatarStateChange,
   }
 }

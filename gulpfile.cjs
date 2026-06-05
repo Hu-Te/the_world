@@ -103,9 +103,27 @@ function mkdirRemote(dir) {
   return withSshClient((conn) => execRemote(conn, `mkdir -p '${dir}'`))
 }
 
-/** Vite 打包（使用当前 Node，避免 gulp 子进程落到 Node 14） */
+function resolveNodeBin() {
+  const candidates = [
+    process.env.DEPLOY_NODE,
+    process.env.NVM_BIN && `${process.env.NVM_BIN}/node`,
+    `${process.env.HOME}/.nvm/versions/node/v24.3.0/bin/node`,
+    `${process.env.HOME}/.nvm/versions/node/v22.0.0/bin/node`,
+    `${process.env.HOME}/.nvm/versions/node/v20.0.0/bin/node`,
+    process.execPath,
+  ].filter(Boolean)
+
+  for (const bin of candidates) {
+    if (existsSync(bin)) return bin
+  }
+  return process.execPath
+}
+
+/** Vite 打包（优先 Node 20+，避免系统 Node 14 无法运行 Vite 7） */
 function buildOnly(done) {
-  run(`"${process.execPath}" ./node_modules/vite/bin/vite.js build`)
+  const nodeBin = resolveNodeBin()
+  console.log(`[deploy] build with ${nodeBin}`)
+  run(`"${nodeBin}" ./node_modules/vite/bin/vite.js build`)
   done()
 }
 

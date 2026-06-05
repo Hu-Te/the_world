@@ -4,9 +4,9 @@ import { disposeObject3D } from '../utils/dispose'
 import { createSeededRandom, range } from '../utils/random'
 import type { WorldModule } from '../types'
 
-const BLADE_COUNT = 8000
+const DEFAULT_BLADE_COUNT = 8000
 
-export function createGrassField(): WorldModule {
+export function createGrassField(bladeCount = DEFAULT_BLADE_COUNT): WorldModule {
   const group = new THREE.Group()
   group.name = 'GrassField'
 
@@ -19,7 +19,7 @@ export function createGrassField(): WorldModule {
     side: THREE.DoubleSide,
   })
 
-  const mesh = new THREE.InstancedMesh(bladeGeo, bladeMat, BLADE_COUNT)
+  const mesh = new THREE.InstancedMesh(bladeGeo, bladeMat, bladeCount)
   mesh.receiveShadow = true
 
   const dummy = new THREE.Object3D()
@@ -27,7 +27,7 @@ export function createGrassField(): WorldModule {
   const spread = 260
   let placed = 0
 
-  for (let attempt = 0; attempt < BLADE_COUNT * 4 && placed < BLADE_COUNT; attempt++) {
+  for (let attempt = 0; attempt < bladeCount * 4 && placed < bladeCount; attempt++) {
     const x = range(rand, -spread, spread)
     const z = range(rand, -spread, spread)
     const dist = Math.sqrt(x * x + z * z)

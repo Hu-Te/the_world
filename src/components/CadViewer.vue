@@ -5,6 +5,7 @@ import 'vjmap/dist/vjmap.min.css'
 import { CAD_PREVIEW_API } from '@/config/api'
 import { CAD_PREVIEW_MAX_BYTES } from '@/config/cadViewer'
 import { VJMAP_ACCESS_TOKEN, VJMAP_SERVICE_URL } from '@/config/vjmapCloud'
+import { appApiFetch } from '@/utils/apiAuth'
 import {
   CAD_RENDER_HINTS,
   CAD_UPLOAD_HINTS,
@@ -254,7 +255,7 @@ async function uploadViaProxy(file: File) {
   form.append('file', file, file.name)
   statusLine.value = '正在转发至云端转码服务…'
 
-  const res = await fetch(`${CAD_PREVIEW_API}/upload-proxy`, {
+  const res = await appApiFetch(`${CAD_PREVIEW_API}/upload-proxy`, {
     method: 'POST',
     body: form,
   })

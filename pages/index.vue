@@ -2,111 +2,118 @@
   <div class="page-home">
     <section class="page-home__hero">
       <ClientOnly>
-        <HomeHeroCanvas @select="openToolbox" />
+        <HomeHeroCanvas
+          ref="canvasRef"
+          @drill-open="onDrillOpen"
+          @drill-close="onDrillClose"
+          @select-tool="onSelectTool" />
         <template #fallback>
           <div class="page-home__fallback" aria-hidden="true" />
         </template>
       </ClientOnly>
 
-      <header class="page-home__brand">
-        <p class="page-home__eyebrow">工具，也值得被陈列</p>
-        <h1 class="page-home__title">{{ config.public.siteName }}</h1>
-        <p class="page-home__desc">
-          转着看路，点着进门。<br class="page-home__br" />工作上的事，交给它们。
+      <header
+        v-show="!drillCat"
+        class="page-home__brand">
+        <p class="page-home__eyebrow">
+          <span>精密工具</span>
+          <i aria-hidden="true" />
+          <span>即开即用</span>
         </p>
+        <h1 class="page-home__title">{{ config.public.siteName }}</h1>
+        <p class="page-home__lead">
+          把校对、核算与检索，放进一条轨道。
+        </p>
+        <ul class="page-home__traits" aria-label="产品特点">
+          <li>
+            <em>01</em>
+            <span>浏览器直达，零安装</span>
+          </li>
+          <li>
+            <em>02</em>
+            <span>行业分舱，场景即选</span>
+          </li>
+          <li>
+            <em>03</em>
+            <span>智能校对，结果可核</span>
+          </li>
+        </ul>
       </header>
-    </section>
 
-    <Teleport to="body">
-      <div
-        v-if="toolboxCat"
-        class="toolbox"
-        role="presentation"
-        @click.self="closeToolbox">
-        <div
-          class="toolbox__panel"
-          role="dialog"
-          aria-modal="true"
-          :aria-labelledby="toolboxTitleId">
-          <header class="toolbox__head">
-            <div>
-              <p class="toolbox__code">{{ toolboxCat.code }} · 工具箱</p>
-              <h2 :id="toolboxTitleId" class="toolbox__title">
-                {{ toolboxCat.name }}
-              </h2>
-              <p class="toolbox__lead">{{ toolboxCat.desc }}</p>
-            </div>
-            <button
-              type="button"
-              class="toolbox__close"
-              aria-label="关闭"
-              @click="closeToolbox">
-              ✕
-            </button>
-          </header>
-
-          <ul class="toolbox__list">
-            <li
-              v-for="tool in toolboxCat.tools"
-              :key="tool.id"
-              class="toolbox__item">
-              <component
-                :is="tool.href ? 'a' : 'div'"
-                class="toolbox__card"
-                :href="tool.href"
-                :target="tool.href ? '_blank' : undefined"
-                :rel="tool.href ? 'noopener noreferrer' : undefined">
-                <div class="toolbox__card-top">
-                  <span class="toolbox__name">{{ tool.name }}</span>
-                  <span
-                    class="toolbox__badge"
-                    :class="`toolbox__badge--${tool.badge}`">
-                    {{ tool.badge }}
-                  </span>
-                </div>
-                <p class="toolbox__desc">{{ tool.desc }}</p>
-              </component>
-            </li>
-          </ul>
+      <aside
+        v-if="drillCat"
+        class="page-home__hud"
+        role="status"
+        aria-live="polite">
+        <div class="page-home__hud-text">
+          <p class="page-home__hud-code">{{ drillCat.code }} · {{ drillCat.name }}</p>
+          <p class="page-home__hud-desc">{{ drillCat.desc }}</p>
         </div>
-      </div>
-    </Teleport>
+        <button
+          type="button"
+          class="page-home__hud-back"
+          @click="closeDrill">
+          返回
+        </button>
+      </aside>
+
+      <p
+        v-if="tip"
+        class="page-home__tip"
+        role="status">
+        {{ tip }}
+      </p>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { getCategory, type ToolCategory } from '~/utils/tools/catalog'
+import { getCategory, type ToolCategory, type ToolItem } from '~/utils/tools/catalog'
 
 const config = useRuntimeConfig()
-const toolboxCat = ref<ToolCategory | null>(null)
-const toolboxTitleId = 'home-toolbox-title'
+const canvasRef = ref<{ closeDrill: () => void } | null>(null)
+const drillCat = ref<ToolCategory | null>(null)
+const tip = ref('')
+let tipTimer = 0
 
 useSeoMeta({
   title: () => config.public.siteName as string,
-  description: '体面一点的三维工具展厅。转着看路，点着进门。',
+  description:
+    '深空测控：浏览器直达的精密工具测控台。行业分舱选型，校对与核算结果可核。',
   ogTitle: () => config.public.siteName as string,
 })
 
-function openToolbox(id: string) {
-  const cat = getCategory(id)
-  if (!cat) return
-  toolboxCat.value = cat
-  document.documentElement.style.overflow = 'hidden'
+function onDrillOpen(id: string) {
+  tip.value = ''
+  window.clearTimeout(tipTimer)
+  drillCat.value = getCategory(id) ?? null
 }
 
-function closeToolbox() {
-  toolboxCat.value = null
-  document.documentElement.style.overflow = ''
+function onDrillClose() {
+  tip.value = ''
+  window.clearTimeout(tipTimer)
+  drillCat.value = null
 }
 
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && toolboxCat.value) closeToolbox()
+function closeDrill() {
+  canvasRef.value?.closeDrill()
 }
 
-onMounted(() => window.addEventListener('keydown', onKeydown))
+function onSelectTool(tool: ToolItem) {
+  if (tool.href?.startsWith('/')) {
+    void navigateTo(tool.href)
+    return
+  }
+  if (tool.href) return
+  tip.value = `${tool.name} · ${tool.badge}`
+  window.clearTimeout(tipTimer)
+  tipTimer = window.setTimeout(() => {
+    tip.value = ''
+  }, 1600)
+}
+
 onUnmounted(() => {
-  window.removeEventListener('keydown', onKeydown)
-  document.documentElement.style.overflow = ''
+  window.clearTimeout(tipTimer)
 })
 </script>
 
@@ -123,107 +130,76 @@ onUnmounted(() => {
   }
 
   &__brand {
-    @apply pointer-events-none absolute left-5 top-14 z-[2] max-w-[16rem] sm:left-8 sm:top-16 sm:max-w-sm lg:left-10;
+    @apply pointer-events-none absolute left-5 top-6 z-[2] max-w-[17.5rem] sm:left-8 sm:top-8 sm:max-w-[20rem] lg:left-10;
     animation: home-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   &__eyebrow {
-    @apply mb-2.5 text-[0.65rem] tracking-[0.22em] text-slate-500;
+    @apply mb-3 flex items-center gap-2 font-mono text-[0.62rem] tracking-[0.2em] text-cyan-soft/70;
+
+    i {
+      @apply h-px w-4 bg-cyan-soft/40;
+    }
   }
 
   &__title {
-    @apply font-display text-[clamp(1.85rem,4.2vw,2.9rem)] font-semibold leading-[0.94] tracking-[-0.04em] text-white;
-  }
-
-  &__desc {
-    @apply mt-3.5 max-w-[15rem] text-[0.8125rem] leading-relaxed text-slate-400 sm:max-w-[18rem] sm:text-sm;
-  }
-
-  &__br {
-    @apply hidden sm:block;
-  }
-}
-
-.toolbox {
-  @apply fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6;
-  background: rgba(2, 6, 12, 0.62);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  animation: toolbox-fade 0.22s ease-out both;
-
-  &__panel {
-    @apply flex w-full max-w-md flex-col overflow-hidden rounded-xl border border-white/10;
-    max-height: min(78vh, 36rem);
-    background: linear-gradient(165deg, rgba(12, 18, 28, 0.96) 0%, rgba(6, 10, 16, 0.98) 100%);
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
-    animation: toolbox-up 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-
-  &__head {
-    @apply flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6;
-  }
-
-  &__code {
-    @apply mb-1.5 font-mono text-[0.65rem] tracking-[0.2em] text-slate-500;
-  }
-
-  &__title {
-    @apply text-lg font-semibold tracking-wide text-slate-50 sm:text-xl;
+    @apply font-display text-[clamp(2rem,4.6vw,3.1rem)] font-semibold leading-[0.92] tracking-[-0.045em] text-white;
+    text-shadow: 0 0 40px rgba(110, 200, 232, 0.12);
   }
 
   &__lead {
+    @apply mt-3.5 max-w-[18rem] text-[0.875rem] leading-[1.65] text-slate-300/90;
+  }
+
+  &__traits {
+    @apply mt-5 space-y-2 border-l border-white/10 pl-3.5;
+
+    li {
+      @apply flex items-baseline gap-2.5;
+      animation: home-in 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+      &:nth-child(1) {
+        animation-delay: 0.12s;
+      }
+      &:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      &:nth-child(3) {
+        animation-delay: 0.28s;
+      }
+    }
+
+    em {
+      @apply shrink-0 font-mono text-[0.58rem] not-italic tracking-[0.14em] text-cyan-soft/55;
+    }
+
+    span {
+      @apply text-[0.75rem] leading-snug tracking-wide text-slate-400;
+    }
+  }
+
+  &__hud {
+    @apply pointer-events-auto absolute left-5 top-6 z-[3] flex max-w-[min(20rem,calc(100vw-5rem))] items-start gap-4 sm:left-8 sm:top-8 lg:left-10;
+    animation: home-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  &__hud-code {
+    @apply font-mono text-[0.68rem] tracking-[0.16em] text-cyan-soft/90;
+  }
+
+  &__hud-desc {
     @apply mt-1.5 text-sm leading-relaxed text-slate-400;
   }
 
-  &__close {
-    @apply shrink-0 rounded-md px-2.5 py-1.5 font-mono text-sm text-slate-500 transition;
-    @apply hover:bg-white/5 hover:text-cyan-soft;
+  &__hud-back {
+    @apply shrink-0 border-b border-cyan-soft/40 pb-0.5 font-mono text-[0.68rem] tracking-[0.18em] text-slate-300 transition;
+    @apply hover:border-cyan-soft hover:text-cyan-soft;
   }
 
-  &__list {
-    @apply overflow-y-auto px-3 py-3 sm:px-4;
-  }
-
-  &__item + &__item {
-    @apply mt-1.5;
-  }
-
-  &__card {
-    @apply block rounded-lg border border-white/10 px-4 py-3.5 transition;
-    background: rgba(255, 255, 255, 0.02);
-
-    &:hover {
-      border-color: rgba(110, 200, 232, 0.28);
-      background: rgba(110, 200, 232, 0.05);
-    }
-  }
-
-  &__card-top {
-    @apply flex flex-wrap items-baseline gap-2;
-  }
-
-  &__name {
-    @apply text-[0.9375rem] font-medium tracking-wide text-slate-100;
-  }
-
-  &__badge {
-    @apply font-mono text-[0.6rem] tracking-wider;
-
-    &--可用 {
-      color: rgba(110, 200, 168, 0.9);
-    }
-
-    &--内测 {
-      color: rgba(200, 176, 110, 0.9);
-    }
-
-    &--筹备中 {
-      color: rgba(120, 140, 156, 0.85);
-    }
-  }
-
-  &__desc {
-    @apply mt-1.5 text-sm leading-relaxed text-slate-500;
+  &__tip {
+    @apply pointer-events-none absolute bottom-16 left-1/2 z-[3] -translate-x-1/2 font-mono text-[0.7rem] tracking-[0.14em] text-slate-300;
+    text-shadow: 0 0 20px rgba(110, 200, 232, 0.25);
+    animation: home-in 0.25s ease-out both;
   }
 }
 
@@ -238,30 +214,11 @@ onUnmounted(() => {
   }
 }
 
-@keyframes toolbox-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes toolbox-up {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .page-home__brand,
-  .toolbox,
-  .toolbox__panel {
+  .page-home__hud,
+  .page-home__tip,
+  .page-home__traits li {
     animation: none;
   }
 }

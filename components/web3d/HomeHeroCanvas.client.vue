@@ -3,21 +3,31 @@
     <canvas
       ref="canvasRef"
       class="home-hero-canvas__el"
-      aria-label="转着看路，点着进门" />
+      aria-label="环视分舱，点入工位" />
     <div class="home-hero-canvas__veil" aria-hidden="true" />
-    <p class="home-hero-canvas__hint" aria-hidden="true">转着看 · 点着进</p>
+    <p class="home-hero-canvas__hint" aria-hidden="true">
+      {{ hintText }}
+    </p>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { HomeHeroManager } from '~/utils/web3d/HomeHeroManager'
+import type { ToolItem } from '~/utils/tools/catalog'
 
 const emit = defineEmits<{
-  select: [id: string]
+  'drill-open': [id: string]
+  'drill-close': []
+  'select-tool': [tool: ToolItem]
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const hostRef = ref<HTMLElement | null>(null)
+const drilling = ref(false)
+
+const hintText = computed(() =>
+  drilling.value ? '环视工具 · 点选进入 · Esc 返回' : '环视分舱 · 点击进入',
+)
 
 let manager: HomeHeroManager | null = null
 let resizeObserver: ResizeObserver | null = null
@@ -34,7 +44,15 @@ onMounted(() => {
       const { HomeHeroManager } = await import('~/utils/web3d/HomeHeroManager')
       manager = new HomeHeroManager({
         canvas,
-        onSelectCategory: (id) => emit('select', id),
+        onDrillOpen: (id) => {
+          drilling.value = true
+          emit('drill-open', id)
+        },
+        onDrillClose: () => {
+          drilling.value = false
+          emit('drill-close')
+        },
+        onSelectTool: (tool) => emit('select-tool', tool),
       })
 
       const applySize = () => {
@@ -64,6 +82,10 @@ onUnmounted(() => {
   manager?.dispose()
   manager = null
 })
+
+defineExpose({
+  closeDrill: () => manager?.closeDrill(),
+})
 </script>
 
 <style scoped lang="scss">
@@ -83,20 +105,19 @@ onUnmounted(() => {
 
   &__veil {
     @apply pointer-events-none absolute inset-0;
-    /* 轻压边角，尽量让星空与地平氛围透出来 */
     background:
       radial-gradient(
-        ellipse 78% 64% at 50% 42%,
+        ellipse 82% 68% at 50% 40%,
         transparent 0%,
-        transparent 62%,
-        rgba(3, 8, 14, 0.18) 100%
+        transparent 72%,
+        rgba(3, 8, 14, 0.1) 100%
       ),
       linear-gradient(
         180deg,
-        rgba(4, 10, 18, 0.28) 0%,
-        transparent 16%,
-        transparent 78%,
-        rgba(3, 8, 14, 0.38) 100%
+        rgba(4, 10, 18, 0.14) 0%,
+        transparent 14%,
+        transparent 82%,
+        rgba(3, 8, 14, 0.22) 100%
       );
   }
 

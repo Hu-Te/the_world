@@ -80,6 +80,13 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     accent: '#6ec4b8',
     tools: [
       {
+        id: 'finance-recon',
+        name: '银行存款勾稽',
+        desc: '日记账与对账单自动勾对',
+        badge: '可用',
+        href: '/tools/recon',
+      },
+      {
         id: 'finance-tax',
         name: '税率速算',
         desc: '含税 / 未税金额一键换算',
@@ -89,12 +96,6 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
         id: 'finance-table',
         name: '表格稽核',
         desc: '金额合计与分项一致性检查',
-        badge: '筹备中',
-      },
-      {
-        id: 'finance-kpi',
-        name: '指标对照',
-        desc: '常用经营指标口径备忘',
         badge: '筹备中',
       },
     ],

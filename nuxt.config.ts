@@ -8,7 +8,7 @@ export default defineNuxtConfig({
     preset: 'static',
     prerender: {
       crawlLinks: true,
-      routes: ['/'],
+      routes: ['/', '/tools/recon'],
     },
   },
 
@@ -25,7 +25,7 @@ export default defineNuxtConfig({
   app: {
     head: {
       htmlAttrs: { lang: 'zh-CN' },
-      title: '工具站',
+      title: '深空测控',
       meta: [
         { charset: 'utf-8' },
         {
@@ -47,7 +47,7 @@ export default defineNuxtConfig({
         },
         {
           name: 'description',
-          content: '实用工具站：浏览器端小工具集合，即开即用。',
+          content: '深空测控：浏览器直达的精密工具测控台。行业分舱选型，校对与核算结果可核。',
         },
       ],
       link: [
@@ -70,8 +70,10 @@ export default defineNuxtConfig({
     public: {
       /** Java 后端（开发可走 Nuxt 代理） */
       apiOrigin: process.env.NUXT_PUBLIC_API_ORIGIN || '',
-      siteName: process.env.NUXT_PUBLIC_SITE_NAME || '工具站',
-      siteTagline: process.env.NUXT_PUBLIC_SITE_TAGLINE || '实用小工具集合',
+      /** 与 Java APP_API_TOKEN 对齐；本地可空 */
+      apiToken: process.env.NUXT_PUBLIC_API_TOKEN || '',
+      siteName: process.env.NUXT_PUBLIC_SITE_NAME || '深空测控',
+      siteTagline: process.env.NUXT_PUBLIC_SITE_TAGLINE || '精密工具 · 即开即用',
       icp: '赣ICP备2026012918号-1',
       icpUrl: 'https://beian.miit.gov.cn/',
     },
@@ -83,6 +85,12 @@ export default defineNuxtConfig({
         '/api': {
           target: process.env.NUXT_BACKEND_URL || 'http://127.0.0.1:8787',
           changeOrigin: true,
+          // 同源代理：去掉浏览器 Origin，避免后端 CORS 白名单绑死前端端口
+          configure(proxy) {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.removeHeader('origin')
+            })
+          },
         },
       },
     },
@@ -115,6 +123,7 @@ export default defineNuxtConfig({
   components: [
     { path: '~/components/ui', pathPrefix: false },
     { path: '~/components/web3d', pathPrefix: false },
+    { path: '~/components/recon', pathPrefix: false },
   ],
 
   imports: {

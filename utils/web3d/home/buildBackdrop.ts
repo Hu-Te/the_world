@@ -40,15 +40,13 @@ function createSpaceTexture(
   ctx.fillStyle = base
   ctx.fillRect(0, 0, size, size)
 
-  // 星云团
+  // 星云团（克制：少而薄，避免整片发雾）
   const blobs: Array<[number, number, number, string, string]> = [
-    [0.28, 0.22, 0.42, 'rgba(50, 110, 170, 0.16)', 'rgba(50, 110, 170, 0.05)'],
-    [0.72, 0.3, 0.36, 'rgba(70, 140, 180, 0.1)', 'rgba(70, 140, 180, 0.03)'],
-    [0.52, 0.58, 0.48, 'rgba(30, 80, 130, 0.12)', 'rgba(30, 80, 130, 0.04)'],
-    [0.18, 0.52, 0.3, 'rgba(60, 160, 180, 0.09)', 'rgba(60, 160, 180, 0.03)'],
-    [0.82, 0.55, 0.32, 'rgba(80, 120, 170, 0.08)', 'rgba(80, 120, 170, 0.025)'],
-    [0.42, 0.18, 0.22, 'rgba(100, 180, 210, 0.07)', 'rgba(100, 180, 210, 0.02)'],
-    [0.6, 0.72, 0.28, 'rgba(50, 100, 140, 0.09)', 'rgba(50, 100, 140, 0.03)'],
+    [0.28, 0.22, 0.34, 'rgba(50, 110, 170, 0.11)', 'rgba(50, 110, 170, 0.03)'],
+    [0.72, 0.3, 0.28, 'rgba(70, 140, 180, 0.07)', 'rgba(70, 140, 180, 0.02)'],
+    [0.52, 0.58, 0.36, 'rgba(30, 80, 130, 0.08)', 'rgba(30, 80, 130, 0.025)'],
+    [0.18, 0.52, 0.24, 'rgba(60, 160, 180, 0.06)', 'rgba(60, 160, 180, 0.02)'],
+    [0.82, 0.55, 0.26, 'rgba(80, 120, 170, 0.055)', 'rgba(80, 120, 170, 0.018)'],
   ]
   for (const [ux, uy, ur, c0, c1] of blobs) {
     const g = ctx.createRadialGradient(
@@ -88,65 +86,66 @@ function createSpaceTexture(
   ctx.fillStyle = bottom
   ctx.fillRect(0, 0, size, size)
 
-  // 远星
-  const starN = size <= 512 ? 420 : 780
+  // 远星（硬边小点，避免糊成雾）
+  const starN = size <= 512 ? 520 : 980
   for (let i = 0; i < starN; i++) {
     const x = rnd() * size
     const y = rnd() * size * 0.88
     const roll = rnd()
-    const r = roll < 0.06 ? 1.6 : roll < 0.25 ? 1.0 : 0.45
-    const a = 0.2 + rnd() * 0.7
+    const r = roll < 0.05 ? 1.35 : roll < 0.22 ? 0.85 : 0.4
+    const a = 0.35 + rnd() * 0.65
     const cool = rnd() > 0.22
     ctx.fillStyle = cool
-      ? `rgba(210, 232, 250, ${a.toFixed(2)})`
-      : `rgba(255, 220, 180, ${(a * 0.85).toFixed(2)})`
+      ? `rgba(220, 238, 255, ${a.toFixed(2)})`
+      : `rgba(255, 228, 190, ${(a * 0.85).toFixed(2)})`
     ctx.beginPath()
     ctx.arc(x, y, r, 0, Math.PI * 2)
     ctx.fill()
   }
 
-  // 亮星十字
-  const bright = size <= 512 ? 12 : 22
+  // 亮星十字（更小光晕）
+  const bright = size <= 512 ? 14 : 26
   for (let i = 0; i < bright; i++) {
     const x = rnd() * size
     const y = rnd() * size * 0.72
-    const glow = ctx.createRadialGradient(x, y, 0, x, y, 8)
-    glow.addColorStop(0, 'rgba(230, 245, 255, 0.9)')
-    glow.addColorStop(0.35, 'rgba(130, 200, 240, 0.28)')
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, 5)
+    glow.addColorStop(0, 'rgba(235, 248, 255, 0.95)')
+    glow.addColorStop(0.4, 'rgba(140, 210, 245, 0.22)')
     glow.addColorStop(1, 'rgba(0,0,0,0)')
     ctx.fillStyle = glow
     ctx.beginPath()
-    ctx.arc(x, y, 8, 0, Math.PI * 2)
+    ctx.arc(x, y, 5, 0, Math.PI * 2)
     ctx.fill()
-    ctx.strokeStyle = 'rgba(190, 225, 255, 0.4)'
-    ctx.lineWidth = 0.7
+    ctx.strokeStyle = 'rgba(200, 230, 255, 0.55)'
+    ctx.lineWidth = 0.8
     ctx.beginPath()
-    ctx.moveTo(x - 7, y)
-    ctx.lineTo(x + 7, y)
-    ctx.moveTo(x, y - 7)
-    ctx.lineTo(x, y + 7)
+    ctx.moveTo(x - 6, y)
+    ctx.lineTo(x + 6, y)
+    ctx.moveTo(x, y - 6)
+    ctx.lineTo(x, y + 6)
     ctx.stroke()
   }
 
-  // 四角暗角，贴穹顶更沉
+  // 四角暗角（减轻，避免整片发灰）
   const vignette = ctx.createRadialGradient(
     size * 0.5,
     size * 0.45,
-    size * 0.3,
+    size * 0.38,
     size * 0.5,
     size * 0.5,
-    size * 0.72,
+    size * 0.78,
   )
   vignette.addColorStop(0, 'rgba(0,0,0,0)')
-  vignette.addColorStop(1, 'rgba(0,0,0,0.45)')
+  vignette.addColorStop(1, 'rgba(0,0,0,0.28)')
   ctx.fillStyle = vignette
   ctx.fillRect(0, 0, size, size)
 
   const tex = new THREE.CanvasTexture(c)
   tex.colorSpace = THREE.SRGBColorSpace
-  tex.anisotropy = 2
+  tex.anisotropy = 4
   tex.generateMipmaps = true
   tex.minFilter = THREE.LinearMipmapLinearFilter
+  tex.magFilter = THREE.LinearFilter
   pushTexture(tex)
   return tex
 }
@@ -253,17 +252,17 @@ export function buildBackdrop(
     quality.backdropStarsNear,
     12,
     8,
-    mobile ? 0.05 : 0.07,
+    mobile ? 0.04 : 0.055,
     -0.1,
   )
   const starsFar = makeStarField(
     quality.backdropStarsFar,
     18,
     9,
-    mobile ? 0.035 : 0.048,
+    mobile ? 0.028 : 0.038,
     0.05,
   )
-  ;(starsFar.material as THREE.PointsMaterial).opacity = 0.55
+  ;(starsFar.material as THREE.PointsMaterial).opacity = 0.62
   root.add(starsNear, starsFar)
 
   // 地面雾盘（收小，不拉出地平横带）
@@ -273,7 +272,7 @@ export function buildBackdrop(
     new THREE.MeshBasicMaterial({
       map: hazeTex,
       transparent: true,
-      opacity: 0.4,
+      opacity: 0.22,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       fog: false,
@@ -316,7 +315,7 @@ export function buildBackdrop(
 
   scene.add(root)
   scene.background = new THREE.Color(INK)
-  scene.fog = new THREE.FogExp2(0x03070e, mobile ? 0.022 : 0.014)
+  scene.fog = new THREE.FogExp2(0x03070e, mobile ? 0.016 : 0.009)
 
   const beamMat = beam.material as THREE.MeshBasicMaterial
   const beamCoreMat = beamCore.material as THREE.MeshBasicMaterial
@@ -333,12 +332,12 @@ export function buildBackdrop(
 
       const breathe = Math.sin(t * 0.65)
       const breathe2 = Math.sin(t * 0.9 + 1.2)
-      beamMat.opacity = 0.022 + breathe * 0.008
-      beamCoreMat.opacity = 0.03 + breathe2 * 0.012
-      hazeMat.opacity = 0.22 + breathe * 0.04
-      haze.scale.setScalar(1 + breathe * 0.025)
-      starsNearMat.opacity = 0.72 + breathe2 * 0.1
-      starsFarMat.opacity = 0.48 + breathe * 0.08
+      beamMat.opacity = 0.018 + breathe * 0.006
+      beamCoreMat.opacity = 0.025 + breathe2 * 0.01
+      hazeMat.opacity = 0.14 + breathe * 0.025
+      haze.scale.setScalar(1 + breathe * 0.02)
+      starsNearMat.opacity = 0.88 + breathe2 * 0.06
+      starsFarMat.opacity = 0.62 + breathe * 0.05
     },
   }
 }

@@ -71,8 +71,10 @@ export function createFloorTexture(
 
   const tex = new THREE.CanvasTexture(c)
   tex.colorSpace = THREE.SRGBColorSpace
-  tex.anisotropy = 2
+  tex.anisotropy = 4
   tex.generateMipmaps = true
+  tex.minFilter = THREE.LinearMipmapLinearFilter
+  tex.magFilter = THREE.LinearFilter
   pushTexture(tex)
   return tex
 }

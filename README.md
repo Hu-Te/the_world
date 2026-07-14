@@ -1,42 +1,53 @@
-# my-project
+# 工具站
 
-This template should help get you started developing with Vue 3 in Vite.
+浏览器端实用工具网站（Nuxt 3 + Three.js 氛围 + Tailwind）。
 
-## Recommended IDE Setup
+## 目录结构
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
-
-## Recommended Browser Setup
-
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
-
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
-npm install
+```
+├── assets/css/          # 全局样式
+├── components/
+│   ├── ui/              # 原子 UI
+│   └── web3d/           # 首页氛围画布外壳
+├── layouts/             # 布局
+├── pages/               # 路由页面
+├── public/              # 静态资源
+├── server/              # Nuxt server 路由
+├── stores/              # Pinia 扁平状态（按需）
+├── types/               # 共享 TS 类型
+├── utils/web3d/         # HomeHeroManager 等纯 TS
+├── deploy/              # Nginx 与部署文档
+├── scripts/             # nvm 启动、gulp 部署
+└── nuxt.config.ts
 ```
 
-### Compile and Hot-Reload for Development
+## 本地开发
 
-```sh
-npm run dev
+包管理器：**Yarn 1**（`packageManager: yarn@1.22.22`）。请勿混用 `npm install`。
+
+```bash
+nvm use        # Node 24
+yarn
+yarn dev       # http://localhost:3000
 ```
 
-### Type-Check, Compile and Minify for Production
+| 命令 | 说明 |
+|------|------|
+| `yarn lint` | ESLint |
+| `yarn typecheck` | TypeScript 检查 |
+| `yarn build` | 静态生成 → `.output/public` |
+| `yarn deploy` | 上传生产环境 |
 
-```sh
-npm run build
-```
+## SFC 约定
+
+1. `<template>`  
+2. `<script setup lang="ts">`  
+3. `<style scoped lang="scss">`
+
+## 架构红线
+
+Three.js 实例不得进入 `ref` / `reactive` / Pinia；见 `.cursorrules`。
+
+## 部署
+
+产物目录：`.output/public`。服务器约定见 `deploy/README.md`。

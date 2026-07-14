@@ -1,0 +1,25 @@
+# 工具站 Frontend Code Rules
+
+## 核心框架
+- 框架: Nuxt 3 (Vue 3, TypeScript)
+- 3D 氛围/能力: Three.js（逻辑在 `utils/web3d/`，如 `HomeHeroManager`）
+- 样式: Tailwind CSS
+- 状态: Pinia（仅扁平数据，可按需新增）
+
+## 3D 性能红线（绝对禁止）
+1. 绝对不允许将 Three.js 的 `Scene`、`Camera`、`Renderer`、`Mesh` 等任何实例放入 Vue 的 `ref`、`reactive` 或 Pinia state！
+2. 3D 引用必须用闭包 / 类字段（推荐）或 `shallowRef` / `markRaw()`。
+3. Three 画布组件必须 `*.client.vue`，或包在 `<ClientOnly>` 内。
+4. Tab 隐藏或画布不可见时禁止继续渲染；预算常量集中在 `utils/web3d/performanceBudget.ts`。
+
+## 编写规范
+1. `onUnmounted` 必须完整释放：geometry、material、texture、composer、renderer `.dispose()`。
+2. UI → 3D 只传扁平值，严禁把 Mesh 传给 UI。
+3. Three.js 经 Vite `manualChunks` 单独分包。
+
+## 目录约定
+- `components/ui` — 原子 UI
+- `components/web3d` — 画布外壳（无引擎实例进响应式）
+- `utils/web3d` — HomeHeroManager 等纯 TS
+- `stores` — 扁平 Pinia（按需）
+- `deploy/` — Nginx / 部署文档（勿随意改服务器约定）

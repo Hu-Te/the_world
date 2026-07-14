@@ -1,0 +1,3 @@
+# 大体积 .glb 建议放到远程 Nginx / CDN，
+# 开发通过 NUXT_PUBLIC_MODEL_CDN_URL + /models-cdn 代理加载。
+# 小样例可放在本目录：public/models/demo.glb

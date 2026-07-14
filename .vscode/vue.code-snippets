@@ -1,0 +1,29 @@
+{
+    "template": {
+      "prefix": "template",
+      "body": [
+        "<template>",
+        "  <div class=\"page\">",
+        "    $1",
+        "  </div>",
+        "</template>",
+        "",
+        "<script setup lang='ts'>",
+        "",
+        "</script>",
+        "",
+        "<style lang=\"scss\" scoped>",
+        "</style>"
+      ],
+      "description": "vue 页面模版"
+    },
+    "interface": {
+      "prefix": "interface",
+      "body": [
+        "interface $1 {",
+        "  $2",
+        "}",
+      ],
+      "description": "vue 接口模版"
+    }
+  }

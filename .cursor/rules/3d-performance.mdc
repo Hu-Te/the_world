@@ -1,0 +1,26 @@
+---
+description: 3D 性能红线与 Nuxt/Three 解耦规范
+alwaysApply: true
+---
+
+# 工具站 Frontend Rules
+
+## 禁止
+- 禁止把 `Scene` / `Camera` / `Renderer` / `Mesh` 放入 `ref` / `reactive` / Pinia
+- 禁止把复杂网格对象当作 props 传给 UI
+- 禁止在不可见 Tab / 离屏画布上继续渲染
+
+## 必须
+- 3D 实例放在 `utils/web3d/*Manager` 闭包字段，或 `shallowRef` / `markRaw`
+- 画布组件使用 `*.client.vue` 或 `<ClientOnly>`
+- `onUnmounted` 完整 `dispose`（geometry / material / texture / composer / renderer）
+- UI 只传扁平参数；Pinia 只存扁平 state
+- 数字预算读 `utils/web3d/performanceBudget.ts`
+
+## 性能预算（氛围场景默认）
+| 项 | 默认 |
+| --- | --- |
+| WebGL 上下文 | ≤ 1 |
+| DPR | 桌面 ≤ 1.5 / 移动 ≤ 1.25 |
+| 阴影 | 默认关 |
+| 后台 Tab / 离屏 | 停渲染；空闲约 30fps |

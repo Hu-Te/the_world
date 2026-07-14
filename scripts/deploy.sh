@@ -45,9 +45,9 @@ fi
 echo "==> 创建远程目录 ${DEPLOY_PATH} ..."
 ssh "${SSH_OPTS[@]}" "$REMOTE" "sudo mkdir -p '$DEPLOY_PATH' && sudo chown -R ${DEPLOY_USER}:${DEPLOY_USER} '$DEPLOY_PATH'"
 
-echo "==> 上传 dist/ 到服务器..."
+echo "==> 上传 .output/public/ 到服务器..."
 rsync -avz --delete -e "$RSYNC_SSH" \
-  "$ROOT_DIR/dist/" \
+  "$ROOT_DIR/.output/public/" \
   "${REMOTE}:${DEPLOY_PATH}/"
 
 echo "==> 部署完成"

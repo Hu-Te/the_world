@@ -5,19 +5,23 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
 node_modules
 .DS_Store
 dist
 dist-ssr
+.output
+.nuxt
+.data
 coverage
 *.local
 deploy.env
 
-# Editor directories and files
+# Editor — 保留工作区规范，忽略个人态
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/vue.code-snippets
 .idea
 *.suo
 *.ntvs*
@@ -26,15 +30,4 @@ deploy.env
 *.sw?
 
 *.tsbuildinfo
-
 .eslintcache
-
-# Cypress
-/cypress/videos/
-/cypress/screenshots/
-
-# Vitest
-__screenshots__/
-
-# Vite
-*.timestamp-*-*.mjs

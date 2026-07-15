@@ -15,9 +15,9 @@ const STAGE_PATH = (
   process.env.DEPLOY_STAGE || '/home/ubuntu/_deploy/three-city'
 ).trim()
 
-/** Nginx 站点根目录 */
+/** Nginx 站点根目录（须与线上 nginx root 一致） */
 const NGINX_PATH = (
-  process.env.DEPLOY_PATH || '/root/my-project/nginx/html'
+  process.env.DEPLOY_PATH || '/home/ubuntu/_deploy/three-city'
 ).trim()
 
 /** Linux 服务器 SFTP 配置 */
@@ -127,8 +127,15 @@ function resolveNodeBin() {
 
 /** Nuxt generate → .output/public（优先 Node 20+） */
 function buildOnly(done) {
+  // 与 Java website.env 的 APP_API_TOKEN 对齐；勿把 DeepSeek key 打进前端
+  if (!process.env.NUXT_PUBLIC_API_TOKEN && process.env.APP_API_TOKEN) {
+    process.env.NUXT_PUBLIC_API_TOKEN = process.env.APP_API_TOKEN
+  }
   const nodeBin = resolveNodeBin()
   console.log(`[deploy] nuxt generate with ${nodeBin}`)
+  console.log(
+    `[deploy] NUXT_PUBLIC_API_TOKEN ${process.env.NUXT_PUBLIC_API_TOKEN ? 'set' : 'empty'}`,
+  )
   run(`"${nodeBin}" ./node_modules/nuxt/bin/nuxt.mjs generate`)
   done()
 }

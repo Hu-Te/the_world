@@ -88,9 +88,10 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
       },
       {
         id: 'finance-tax',
-        name: '税率速算',
-        desc: '含税 / 未税金额一键换算',
-        badge: '筹备中',
+        name: '企税利润倒推',
+        desc: '目标税后利润反推最低营收或最大成本',
+        badge: '可用',
+        href: '/tools/cit-profit',
       },
       {
         id: 'finance-table',

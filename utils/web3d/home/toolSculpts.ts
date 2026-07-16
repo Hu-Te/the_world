@@ -18,7 +18,7 @@ function mesh(
 
 /**
  * 分类下工具轻量雕塑（比分类雕塑小约 0.4 倍）
- * index 在同类内区分轮廓，避免三件同款。
+ * index 在同类内区分轮廓，避免多件同款。
  */
 export function sculptTool(
   categoryId: string,
@@ -53,27 +53,57 @@ export function sculptTool(
       break
 
     case 'finance':
-      if (v === 0) {
-        const pie = mesh(geos.cylinder(0.28, 0.28, 0.08, seg), kit.crystal)
-        emblem.add(pie)
-        emblem.add(mesh(geos.cylinder(0.12, 0.12, 0.1, 10), kit.core, 0.06, 0.02, 0.04))
-        emblem.add(mesh(geos.box(0.22, 0.02, 0.04), kit.tip, 0.1, 0.06, 0))
-      } else if (v === 1) {
-        emblem.add(mesh(geos.rbox(0.5, 0.62, 0.08, 0.03, rs), kit.shell))
+      // 与 catalog 顺序对齐：0 勾稽 / 1 企税倒推 / 2 语料熔炼 / 3 税收扫描
+      if (index === 0) {
+        // 银行存款勾稽：双屏账册 + 配对桥线
+        emblem.add(mesh(geos.rbox(0.26, 0.58, 0.06, 0.02, rs), kit.shell, -0.22, 0.02, 0))
+        emblem.add(mesh(geos.rbox(0.26, 0.58, 0.06, 0.02, rs), kit.shell, 0.22, 0.02, 0))
         for (let i = 0; i < 4; i++) {
-          emblem.add(mesh(geos.box(0.34, 0.02, 0.01), kit.tip, 0, -0.18 + i * 0.12, 0.05))
+          const y = -0.18 + i * 0.12
+          emblem.add(mesh(geos.box(0.16, 0.014, 0.01), kit.tip, -0.22, y, 0.04))
+          emblem.add(mesh(geos.box(0.16, 0.014, 0.01), kit.chrome, 0.22, y, 0.04))
         }
-        emblem.add(mesh(geos.sphere(0.045, 8), kit.core, 0, 0.28, 0.06))
+        emblem.add(mesh(geos.box(0.28, 0.012, 0.012), kit.core, 0, 0.06, 0.02))
+        emblem.add(mesh(geos.box(0.28, 0.012, 0.012), kit.core, 0, -0.08, 0.02))
+        emblem.add(mesh(geos.sphere(0.035, 8), kit.tip, 0, 0.2, 0.05))
+        if (rich) {
+          emblem.add(mesh(geos.rbox(0.58, 0.04, 0.22, 0.015, rs), kit.chrome, 0, -0.34, 0))
+        }
+      } else if (index === 1) {
+        // 企税利润倒推：税后目标 → 反推税前塔 + 加计环
+        emblem.add(mesh(geos.cylinder(0.22, 0.28, 0.06, seg), kit.shell, 0, -0.28, 0))
+        emblem.add(mesh(geos.cylinder(0.16, 0.2, 0.28, seg), kit.crystal, 0, -0.08, 0))
+        emblem.add(mesh(geos.cylinder(0.1, 0.14, 0.22, seg), kit.chrome, 0, 0.16, 0))
+        emblem.add(mesh(geos.sphere(0.055, 10), kit.core, 0, 0.34, 0))
+        const ring = mesh(geos.torus(0.2, 0.014, 8, seg), kit.tip, 0, 0.02, 0)
+        ring.rotation.x = Math.PI / 2
+        emblem.add(ring)
+        if (rich) {
+          const ring2 = mesh(geos.torus(0.26, 0.01, 8, seg), kit.shell, 0, -0.12, 0)
+          ring2.rotation.x = Math.PI / 2
+          emblem.add(ring2)
+          emblem.add(mesh(geos.box(0.02, 0.16, 0.02), kit.tip, 0.32, 0.05, 0))
+          emblem.add(mesh(geos.octahedron(0.045), kit.core, 0.32, 0.16, 0))
+        }
+      } else if (index === 2) {
+        // 全息语料熔炼舱：熔炉片 + 核心晶
+        emblem.add(mesh(geos.rbox(0.42, 0.42, 0.1, 0.03, rs), kit.shell))
+        emblem.add(mesh(geos.octahedron(0.1), kit.core, 0, 0.02, 0.08))
+        emblem.add(mesh(geos.torus(0.2, 0.012, 8, seg), kit.tip, 0, -0.02, 0))
       } else {
-        for (const [x, h] of [
-          [-0.18, 0.28],
-          [0, 0.48],
-          [0.18, 0.36],
-        ] as const) {
-          emblem.add(mesh(geos.cylinder(0.05, 0.055, h, 8), kit.chrome, x, h / 2 - 0.2, 0))
-          emblem.add(mesh(geos.sphere(0.03, 8), kit.tip, x, h / 2 - 0.16, 0))
+        // 税收红利扫描舱：雷达环 + 警示棱锥
+        emblem.add(mesh(geos.cylinder(0.28, 0.28, 0.04, seg), kit.shell, 0, -0.2, 0))
+        const scan = mesh(geos.torus(0.24, 0.016, 8, seg), kit.tip, 0, -0.08, 0)
+        scan.rotation.x = Math.PI / 2
+        emblem.add(scan)
+        const scan2 = mesh(geos.torus(0.16, 0.012, 8, seg), kit.chrome, 0, 0.02, 0)
+        scan2.rotation.x = Math.PI / 2
+        emblem.add(scan2)
+        emblem.add(mesh(geos.octahedron(0.09), kit.core, 0, 0.18, 0))
+        if (rich) {
+          emblem.add(mesh(geos.box(0.02, 0.22, 0.02), kit.tip, 0.26, 0.05, 0))
+          emblem.add(mesh(geos.sphere(0.03, 8), kit.core, 0.26, 0.2, 0))
         }
-        emblem.add(mesh(geos.rbox(0.5, 0.04, 0.2, 0.02, rs), kit.shell, 0, -0.24, 0))
       }
       break
 

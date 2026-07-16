@@ -35,6 +35,7 @@ export type ToolsBuildResult = {
 function makeToolLabel(
   name: string,
   badge: string,
+  desc: string,
   accent: number,
   pushTexture: (t: THREE.Texture) => void,
 ): THREE.Sprite {
@@ -42,19 +43,26 @@ function makeToolLabel(
   const scale = Math.max(2, Math.round(dpr * 2))
 
   const fontName =
-    '500 12px "IBM Plex Sans SC", "PingFang SC", "Hiragino Sans GB", sans-serif'
-  const fontBadge = '500 9px "IBM Plex Mono", ui-monospace, monospace'
+    '600 13px "IBM Plex Sans SC", "PingFang SC", "Hiragino Sans GB", sans-serif'
+  const fontBadge = '500 10px "IBM Plex Mono", ui-monospace, monospace'
+  const fontDesc =
+    '500 10px "IBM Plex Sans SC", "PingFang SC", "Hiragino Sans GB", sans-serif'
+
+  const shortDesc = desc.length > 22 ? `${desc.slice(0, 21)}…` : desc
 
   const measure = document.createElement('canvas').getContext('2d')!
   measure.font = fontName
   const nameW = Math.ceil(measure.measureText(name).width)
   measure.font = fontBadge
   const badgeW = Math.ceil(measure.measureText(badge).width)
+  measure.font = fontDesc
+  const descW = Math.ceil(measure.measureText(shortDesc).width)
 
   const padX = 10
   const gap = 8
-  const logicalW = padX * 2 + nameW + gap + badgeW
-  const logicalH = 24
+  const row1W = padX * 2 + nameW + gap + badgeW
+  const logicalW = Math.max(row1W, padX * 2 + descW + 4)
+  const logicalH = shortDesc ? 38 : 26
   const c = document.createElement('canvas')
   c.width = Math.ceil(logicalW * scale)
   c.height = Math.ceil(logicalH * scale)
@@ -65,38 +73,52 @@ function makeToolLabel(
 
   const accentHex = `#${accent.toString(16).padStart(6, '0')}`
   ctx.beginPath()
-  const r = 3
+  const r = 4
   ctx.moveTo(r, 0.5)
   ctx.arcTo(logicalW - 0.5, 0.5, logicalW - 0.5, logicalH - 0.5, r)
   ctx.arcTo(logicalW - 0.5, logicalH - 0.5, 0.5, logicalH - 0.5, r)
   ctx.arcTo(0.5, logicalH - 0.5, 0.5, 0.5, r)
   ctx.arcTo(0.5, 0.5, logicalW - 0.5, 0.5, r)
   ctx.closePath()
-  ctx.fillStyle = 'rgba(4, 10, 16, 0.82)'
+  ctx.fillStyle = 'rgba(4, 10, 16, 0.88)'
   ctx.fill()
-  ctx.strokeStyle = 'rgba(110, 200, 232, 0.32)'
+  ctx.strokeStyle = `${accentHex}66`
   ctx.lineWidth = 1
   ctx.stroke()
 
+  ctx.shadowColor = `${accentHex}99`
+  ctx.shadowBlur = 6
   ctx.fillStyle = accentHex
-  ctx.fillRect(1.5, 5, 2, logicalH - 10)
+  ctx.fillRect(1.5, 5, 2.5, logicalH - 10)
+  ctx.shadowBlur = 0
 
-  const midY = logicalH / 2
   ctx.textBaseline = 'middle'
   ctx.textAlign = 'left'
   ctx.font = fontName
-  ctx.fillStyle = 'rgba(228, 240, 248, 0.95)'
-  ctx.fillText(name, padX + 2, midY)
+  ctx.fillStyle = 'rgba(236, 248, 252, 0.98)'
+  ctx.shadowColor = `${accentHex}55`
+  ctx.shadowBlur = 4
+  ctx.fillText(name, padX + 2, shortDesc ? 12 : logicalH / 2)
+  ctx.shadowBlur = 0
 
   ctx.font = fontBadge
   const badgeColor =
     badge === '可用'
-      ? 'rgba(110, 200, 168, 0.95)'
+      ? 'rgba(110, 220, 180, 0.98)'
       : badge === '内测'
-        ? 'rgba(200, 176, 110, 0.95)'
+        ? 'rgba(220, 190, 110, 0.95)'
         : 'rgba(140, 160, 176, 0.9)'
   ctx.fillStyle = badgeColor
-  ctx.fillText(badge, padX + 2 + nameW + gap, midY)
+  ctx.shadowColor = badge === '可用' ? 'rgba(110, 220, 180, 0.55)' : 'transparent'
+  ctx.shadowBlur = badge === '可用' ? 5 : 0
+  ctx.fillText(badge, padX + 2 + nameW + gap, shortDesc ? 12 : logicalH / 2)
+  ctx.shadowBlur = 0
+
+  if (shortDesc) {
+    ctx.font = fontDesc
+    ctx.fillStyle = 'rgba(170, 200, 210, 0.92)'
+    ctx.fillText(shortDesc, padX + 2, 28)
+  }
 
   const tex = new THREE.CanvasTexture(c)
   tex.colorSpace = THREE.SRGBColorSpace
@@ -114,9 +136,9 @@ function makeToolLabel(
       opacity: 1,
     }),
   )
-  const worldH = 0.145
+  const worldH = shortDesc ? 0.2 : 0.155
   sprite.scale.set(worldH * (logicalW / logicalH), worldH, 1)
-  sprite.position.y = -0.72
+  sprite.position.y = -0.78
   return sprite
 }
 
@@ -146,16 +168,17 @@ export function buildTools(options: {
   const nodes: ToolNode[] = []
   const pickMeshes: THREE.Mesh[] = []
 
-  const tools = cat.tools.slice(0, 3)
+  // 财务等分类可挂 4 个可用工具；再多仍截断以免轨道重叠
+  const tools = cat.tools.slice(0, 4)
   const n = tools.length
-  // 围绕工具箱：半径加大，给更大模型留出间距
-  const orbitR = n <= 2 ? 2.45 : 2.35
+  // 围绕工具箱：工具越多半径略加大
+  const orbitR = n <= 2 ? 2.45 : n === 3 ? 2.35 : 2.55
   const baseHeight = 0.62
 
   tools.forEach((tool, i) => {
     // 微偏起始角，避开正对镜头时整块挡分类
     const orbitAngle = (i / n) * Math.PI * 2 - Math.PI / 2 + 0.35
-    const height = baseHeight + (i % 3) * 0.22 - 0.1
+    const height = baseHeight + (i % 4) * 0.18 - 0.12
 
     const nodeRoot = new THREE.Group()
     nodeRoot.position.set(
@@ -171,11 +194,12 @@ export function buildTools(options: {
 
     const { emblem } = sculptTool(cat.id, i, kit, geos, quality)
     emblem.position.y = 0.18
-    emblem.scale.setScalar(0.92)
+    // 财务仅两工具时略放大，便于辨认
+    emblem.scale.setScalar(n <= 2 ? 1.05 : n >= 4 ? 0.86 : 0.92)
     visual.add(emblem)
 
     visual.add(
-      makeToolLabel(tool.name, tool.badge, accent, (tex) => {
+      makeToolLabel(tool.name, tool.badge, tool.desc, accent, (tex) => {
         ownedTex.push(tex)
       }),
     )

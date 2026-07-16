@@ -12,7 +12,7 @@
           </div>
           <h1 id="cit-title" class="cit-modal__title">企税利润倒推</h1>
           <p class="cit-modal__lead">
-            给定目标税后利润与政策参数，反推最低营收或可容忍最大成本（简化测算）
+            目标税后利润 + 成本/收入结构 + 常见纳税调整，反推最低营收或最大可配成本（多场景简化测算）
           </p>
         </div>
         <button type="button" class="cit-modal__close" aria-label="关闭" @click="goHome">✕</button>
@@ -53,8 +53,8 @@
               <span>企业所得税率</span>
               <select v-model="rateKey">
                 <option value="0.25">25% 一般企业</option>
-                <option value="0.2">20% 示意档</option>
-                <option value="0.15">15% 高新等示意</option>
+                <option value="0.2">20% 示意小微</option>
+                <option value="0.15">15% 高新/西部等示意</option>
                 <option value="custom">自定义…</option>
               </select>
             </label>
@@ -62,43 +62,130 @@
               <span>自定义税率 %</span>
               <input v-model.number="customRatePct" type="number" step="0.01" min="0" max="99.99" />
             </label>
-
-            <label class="cit-field">
-              <span>研发费用</span>
-              <input
-                v-model.number="rdExpense"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="可选，默认 0"
-              />
-            </label>
-            <label class="cit-field">
-              <span>加计扣除比例 %</span>
-              <input v-model.number="rdSuperPct" type="number" step="1" min="0" max="200" />
-            </label>
-
-            <label v-if="mode === 'minRevenue'" class="cit-field">
-              <span>总成本（含期间费用等）</span>
-              <input
-                v-model.number="totalCost"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="必填"
-              />
-            </label>
-            <label v-else class="cit-field">
-              <span>给定营收</span>
-              <input
-                v-model.number="revenue"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="必填"
-              />
-            </label>
           </div>
+
+          <div v-if="mode === 'minRevenue'" class="cit-block">
+            <header class="cit-block__head">
+              <h3>成本结构</h3>
+              <span>合计 {{ money(costSumLive) }}</span>
+            </header>
+            <div class="cit-fields">
+              <label class="cit-field">
+                <span>营业成本</span>
+                <input
+                  v-model.number="operatingCost"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="材料/人工/制造等"
+                />
+              </label>
+              <label class="cit-field">
+                <span>期间费用</span>
+                <input
+                  v-model.number="periodExpense"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="销售/管理/财务等"
+                />
+              </label>
+              <label class="cit-field">
+                <span>其他支出</span>
+                <input
+                  v-model.number="otherExpense"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="营业外、一次性等"
+                />
+              </label>
+            </div>
+            <p class="cit-block__tip">至少填一项；未填分项记 0。亦可只填其中一类简化。</p>
+          </div>
+
+          <div v-else class="cit-block">
+            <header class="cit-block__head">
+              <h3>收入结构</h3>
+              <span>合计 {{ money(revenueSumLive) }}</span>
+            </header>
+            <div class="cit-fields">
+              <label class="cit-field">
+                <span>营业收入</span>
+                <input
+                  v-model.number="operatingRevenue"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="主业收入"
+                />
+              </label>
+              <label class="cit-field">
+                <span>其他收益</span>
+                <input
+                  v-model.number="otherIncome"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="投资收益、营业外等"
+                />
+              </label>
+            </div>
+            <p class="cit-block__tip">至少填一项。结论为在既定收入下可容忍的最大成本合计。</p>
+          </div>
+
+          <details class="cit-adv" :open="taxOpen">
+            <summary @click.prevent="taxOpen = !taxOpen">
+              纳税调整 / 研发加计（可选）
+              <em>{{ taxOpen ? '收起' : '展开' }}</em>
+            </summary>
+            <div class="cit-fields">
+              <label class="cit-field">
+                <span>研发费用</span>
+                <input
+                  v-model.number="rdExpense"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="已入成本也可填加计"
+                />
+              </label>
+              <label class="cit-field">
+                <span>加计扣除比例 %</span>
+                <input v-model.number="rdSuperPct" type="number" step="1" min="0" max="200" />
+              </label>
+              <label class="cit-field">
+                <span>纳税调增</span>
+                <input
+                  v-model.number="taxAddBack"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="罚款、超标招待等"
+                />
+              </label>
+              <label class="cit-field">
+                <span>免税收入</span>
+                <input
+                  v-model.number="taxExempt"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="国债利息等"
+                />
+              </label>
+              <label class="cit-field">
+                <span>弥补以前年度亏损</span>
+                <input
+                  v-model.number="lossCarry"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="可税前弥补额"
+                />
+              </label>
+            </div>
+          </details>
 
           <p v-if="ready && error" class="cit-err">{{ error }}</p>
         </section>
@@ -129,8 +216,24 @@
               <p>应纳税所得额</p>
               <strong>{{ money(result.taxableIncome) }}</strong>
             </div>
+            <div>
+              <p>有效税负</p>
+              <strong>{{ pct(result.effectiveTaxRate) }}</strong>
+            </div>
+            <div v-if="mode === 'minRevenue' && result.costSum != null">
+              <p>成本合计</p>
+              <strong>{{ money(result.costSum) }}</strong>
+            </div>
+            <div v-else-if="result.revenueSum != null">
+              <p>收入合计</p>
+              <strong>{{ money(result.revenueSum) }}</strong>
+            </div>
+            <div>
+              <p>税基净调整</p>
+              <strong>{{ money(result.meta.taxBaseAdj) }}</strong>
+            </div>
             <div class="cit-stats__hl">
-              <p>{{ mode === 'minRevenue' ? '最低营收' : '最大成本' }}</p>
+              <p>{{ mode === 'minRevenue' ? '最低营收' : '最大可配成本' }}</p>
               <strong>
                 {{
                   money(
@@ -140,7 +243,9 @@
               </strong>
             </div>
           </div>
-          <p v-else class="cit-hint">请先填写必填项（目标税后利润 + 成本或营收）</p>
+          <p v-else class="cit-hint">
+            请先填写目标税后利润，并至少填一项{{ mode === 'minRevenue' ? '成本' : '收入' }}
+          </p>
 
           <aside v-if="history.length" class="cit-hist">
             <header>
@@ -158,7 +263,8 @@
           </aside>
 
           <p class="cit-disclaimer">
-            本工具为简化测算：中间量高精度，展示两位并轧平「税前 = 税后 + 税额」。非正式纳税申报依据。
+            简化模型：会计利润经「调增 − 免税 − 研发加计 − 亏损弥补」得税基；展示轧平「税前 = 税后 +
+            税额」。不含增值税、附加税、递延所得税等，非正式申报依据。
           </p>
         </section>
       </div>
@@ -175,8 +281,11 @@ import {
 } from '~/utils/finance/citProfitHistory'
 import {
   formatCitSummary,
+  resolveCostSum,
+  resolveRevenueSum,
   reverseCitProfit,
   type CitMode,
+  type CitReverseInput,
   type CitReverseResult,
 } from '~/utils/finance/citProfitReverse'
 
@@ -184,17 +293,27 @@ definePageMeta({ layout: false })
 
 useSeoMeta({
   title: '企税利润倒推',
-  description: '企业所得税与税后利润逆向推导：估最低营收或最大成本',
+  description: '多场景企税倒推：成本/收入分项 + 纳税调整，估最低营收或最大成本',
 })
 
 const mode = ref<CitMode>('minRevenue')
 const afterTax = ref<number | null>(null)
 const rateKey = ref('0.25')
 const customRatePct = ref(25)
+
+const operatingCost = ref<number | null>(null)
+const periodExpense = ref<number | null>(null)
+const otherExpense = ref<number | null>(null)
+const operatingRevenue = ref<number | null>(null)
+const otherIncome = ref<number | null>(null)
+
 const rdExpense = ref<number | null>(null)
 const rdSuperPct = ref(100)
-const totalCost = ref<number | null>(null)
-const revenue = ref<number | null>(null)
+const taxAddBack = ref<number | null>(null)
+const taxExempt = ref<number | null>(null)
+const lossCarry = ref<number | null>(null)
+const taxOpen = ref(false)
+
 const copied = ref(false)
 const history = ref<CitHistoryItem[]>([])
 
@@ -207,21 +326,50 @@ const taxRate = computed(() => {
   return Number(rateKey.value) || 0.25
 })
 
-/** 必填齐才测算，避免演示默认值造成「没填也有结果」 */
+const costDraft = computed(
+  (): CitReverseInput => ({
+    afterTaxProfit: 0,
+    taxRate: 0,
+    mode: 'minRevenue',
+    operatingCost: operatingCost.value ?? undefined,
+    periodExpense: periodExpense.value ?? undefined,
+    otherExpense: otherExpense.value ?? undefined,
+  }),
+)
+
+const revenueDraft = computed(
+  (): CitReverseInput => ({
+    afterTaxProfit: 0,
+    taxRate: 0,
+    mode: 'maxCost',
+    operatingRevenue: operatingRevenue.value ?? undefined,
+    otherIncome: otherIncome.value ?? undefined,
+  }),
+)
+
+const costSumLive = computed(() => resolveCostSum(costDraft.value) ?? 0)
+const revenueSumLive = computed(() => resolveRevenueSum(revenueDraft.value) ?? 0)
+
 const ready = computed(() => {
   if (!isNum(afterTax.value)) return false
-  if (mode.value === 'minRevenue') return isNum(totalCost.value)
-  return isNum(revenue.value)
+  if (mode.value === 'minRevenue') return resolveCostSum(costDraft.value) != null
+  return resolveRevenueSum(revenueDraft.value) != null
 })
 
-const currentInput = computed(() => ({
+const currentInput = computed((): CitReverseInput => ({
   afterTaxProfit: afterTax.value ?? 0,
   taxRate: taxRate.value,
+  mode: mode.value,
+  operatingCost: operatingCost.value ?? undefined,
+  periodExpense: periodExpense.value ?? undefined,
+  otherExpense: otherExpense.value ?? undefined,
+  operatingRevenue: operatingRevenue.value ?? undefined,
+  otherIncome: otherIncome.value ?? undefined,
   rdExpense: rdExpense.value ?? 0,
   rdSuperDeduction: (Number(rdSuperPct.value) || 0) / 100,
-  mode: mode.value,
-  totalCost: totalCost.value ?? 0,
-  revenue: revenue.value ?? 0,
+  taxAddBack: taxAddBack.value ?? 0,
+  taxExemptIncome: taxExempt.value ?? 0,
+  lossCarryforward: lossCarry.value ?? 0,
 }))
 
 const output = computed(() => {
@@ -240,6 +388,13 @@ function money(n: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
+}
+
+function pct(n: number) {
+  return `${(n * 100).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}%`
 }
 
 function formatTime(ts: number) {
@@ -286,10 +441,38 @@ function onClearHist() {
 function applyHistory(h: CitHistoryItem) {
   mode.value = h.input.mode
   afterTax.value = h.input.afterTaxProfit
-  rdExpense.value = h.input.rdExpense
-  rdSuperPct.value = Math.round(h.input.rdSuperDeduction * 100)
-  totalCost.value = h.input.totalCost ?? 0
-  revenue.value = h.input.revenue ?? 0
+  operatingCost.value = h.input.operatingCost ?? null
+  periodExpense.value = h.input.periodExpense ?? null
+  otherExpense.value = h.input.otherExpense ?? null
+  // 兼容旧历史仅有 totalCost
+  if (
+    !isNum(operatingCost.value) &&
+    !isNum(periodExpense.value) &&
+    !isNum(otherExpense.value) &&
+    isNum(h.input.totalCost)
+  ) {
+    periodExpense.value = h.input.totalCost
+  }
+  operatingRevenue.value = h.input.operatingRevenue ?? null
+  otherIncome.value = h.input.otherIncome ?? null
+  if (
+    !isNum(operatingRevenue.value) &&
+    !isNum(otherIncome.value) &&
+    isNum(h.input.revenue)
+  ) {
+    operatingRevenue.value = h.input.revenue
+  }
+  rdExpense.value = h.input.rdExpense ?? null
+  rdSuperPct.value = Math.round((h.input.rdSuperDeduction ?? 1) * 100)
+  taxAddBack.value = h.input.taxAddBack ?? null
+  taxExempt.value = h.input.taxExemptIncome ?? null
+  lossCarry.value = h.input.lossCarryforward ?? null
+  taxOpen.value = Boolean(
+    (h.input.rdExpense ?? 0) ||
+      (h.input.taxAddBack ?? 0) ||
+      (h.input.taxExemptIncome ?? 0) ||
+      (h.input.lossCarryforward ?? 0),
+  )
   const r = h.input.taxRate
   if (Math.abs(r - 0.25) < 1e-9) rateKey.value = '0.25'
   else if (Math.abs(r - 0.2) < 1e-9) rateKey.value = '0.2'
@@ -456,6 +639,54 @@ $glow-title: 0 0 18px rgba(110, 196, 184, 0.45), 0 0 6px rgba(230, 255, 245, 0.5
   @media (min-width: 480px) {
     @apply gap-4;
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+.cit-block {
+  @apply mt-5 rounded-lg border border-white/10 bg-white/[0.03];
+  padding: clamp(0.75rem, 2vw, 1rem);
+
+  &__head {
+    @apply mb-3 flex flex-wrap items-baseline justify-between gap-2;
+
+    h3 {
+      @apply font-mono tracking-[0.14em] text-emerald-100;
+      font-size: clamp(0.72rem, 1.8vw, 0.8rem);
+      text-shadow: $glow-soft;
+    }
+
+    span {
+      @apply font-mono text-slate-300;
+      font-size: clamp(0.7rem, 1.7vw, 0.8rem);
+      text-shadow: $glow-soft;
+    }
+  }
+
+  &__tip {
+    @apply mt-2.5 font-mono leading-relaxed text-slate-400;
+    font-size: clamp(0.65rem, 1.5vw, 0.72rem);
+    text-shadow: $glow-soft;
+  }
+}
+
+.cit-adv {
+  @apply mt-5 rounded-lg border border-emerald-400/20 bg-emerald-400/[0.04];
+  padding: clamp(0.65rem, 1.8vw, 0.85rem) clamp(0.75rem, 2vw, 1rem);
+
+  summary {
+    @apply flex cursor-pointer list-none items-center justify-between gap-2;
+    @apply font-mono tracking-[0.12em] text-emerald-100/90;
+    font-size: clamp(0.72rem, 1.8vw, 0.8rem);
+    text-shadow: $glow-soft;
+
+    em {
+      @apply not-italic text-slate-400;
+      font-size: clamp(0.65rem, 1.5vw, 0.72rem);
+    }
+  }
+
+  .cit-fields {
+    @apply mt-3;
   }
 }
 

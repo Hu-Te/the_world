@@ -8,7 +8,7 @@ export default defineNuxtConfig({
     preset: 'static',
     prerender: {
       crawlLinks: true,
-      routes: ['/', '/tools/recon', '/tools/cit-profit'],
+      routes: ['/', '/tools/recon', '/tools/cit-profit', '/tools/lexicore', '/tools/tax-planner'],
     },
   },
 
@@ -30,8 +30,7 @@ export default defineNuxtConfig({
         { charset: 'utf-8' },
         {
           name: 'viewport',
-          content:
-            'width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0',
+          content: 'width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0',
         },
         {
           name: 'format-detection',
@@ -112,7 +111,7 @@ export default defineNuxtConfig({
   /** 局域网 IP 访问（手机 / 同网段调试） */
   devServer: {
     host: '0.0.0.0',
-    port: 3000,
+    port: 3111,
   },
 
   typescript: {
@@ -124,6 +123,7 @@ export default defineNuxtConfig({
     { path: '~/components/ui', pathPrefix: false },
     { path: '~/components/web3d', pathPrefix: false },
     { path: '~/components/recon', pathPrefix: false },
+    { path: '~/components/tax', pathPrefix: false },
   ],
 
   imports: {

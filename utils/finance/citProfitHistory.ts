@@ -1,17 +1,23 @@
 import type { CitMode, CitReverseInput, CitReverseResult } from './citProfitReverse'
 
-const KEY = 'cit-profit:history:v1'
+const KEY = 'cit-profit:history:v2'
 const MAX = 20
 
 export type CitHistoryItem = {
   id: string
   savedAt: number
   input: CitReverseInput
-  /** 结论摘要一行 */
   headline: string
   result: Pick<
     CitReverseResult,
-    'preTaxProfit' | 'incomeTax' | 'afterTaxProfit' | 'minRevenue' | 'maxCost'
+    | 'preTaxProfit'
+    | 'incomeTax'
+    | 'afterTaxProfit'
+    | 'minRevenue'
+    | 'maxCost'
+    | 'effectiveTaxRate'
+    | 'costSum'
+    | 'revenueSum'
   >
 }
 
@@ -51,12 +57,15 @@ export function saveCitHistoryItem(
       afterTaxProfit: result.afterTaxProfit,
       minRevenue: result.minRevenue,
       maxCost: result.maxCost,
+      effectiveTaxRate: result.effectiveTaxRate,
+      costSum: result.costSum,
+      revenueSum: result.revenueSum,
     },
   }
-  const next = [item, ...loadCitHistory().filter((h) => JSON.stringify(h.input) !== JSON.stringify(input))].slice(
-    0,
-    MAX,
-  )
+  const next = [
+    item,
+    ...loadCitHistory().filter((h) => JSON.stringify(h.input) !== JSON.stringify(input)),
+  ].slice(0, MAX)
   if (canUseStorage()) {
     try {
       localStorage.setItem(KEY, JSON.stringify(next))

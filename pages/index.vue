@@ -12,18 +12,14 @@
         </template>
       </ClientOnly>
 
-      <header
-        v-show="!drillCat"
-        class="page-home__brand">
+      <header v-show="!drillCat" class="page-home__brand">
         <p class="page-home__eyebrow">
           <span>精密工具</span>
           <i aria-hidden="true" />
           <span>即开即用</span>
         </p>
         <h1 class="page-home__title">{{ config.public.siteName }}</h1>
-        <p class="page-home__lead">
-          把校对、核算与检索，放进一条轨道。
-        </p>
+        <p class="page-home__lead">把校对、核算与检索，放进一条轨道。</p>
         <ul class="page-home__traits" aria-label="产品特点">
           <li>
             <em>01</em>
@@ -40,27 +36,15 @@
         </ul>
       </header>
 
-      <aside
-        v-if="drillCat"
-        class="page-home__hud"
-        role="status"
-        aria-live="polite">
+      <aside v-if="drillCat" class="page-home__hud" role="status" aria-live="polite">
         <div class="page-home__hud-text">
           <p class="page-home__hud-code">{{ drillCat.code }} · {{ drillCat.name }}</p>
           <p class="page-home__hud-desc">{{ drillCat.desc }}</p>
         </div>
-        <button
-          type="button"
-          class="page-home__hud-back"
-          @click="closeDrill">
-          返回
-        </button>
+        <button type="button" class="page-home__hud-back" @click="closeDrill">返回</button>
       </aside>
 
-      <p
-        v-if="tip"
-        class="page-home__tip"
-        role="status">
+      <p v-if="tip" class="page-home__tip" role="status">
         {{ tip }}
       </p>
     </section>
@@ -78,8 +62,7 @@ let tipTimer = 0
 
 useSeoMeta({
   title: () => config.public.siteName as string,
-  description:
-    '深空测控：浏览器直达的精密工具测控台。行业分舱选型，校对与核算结果可核。',
+  description: '深空测控：浏览器直达的精密工具测控台。行业分舱选型，校对与核算结果可核。',
   ogTitle: () => config.public.siteName as string,
 })
 

@@ -8,7 +8,7 @@ export default defineNuxtConfig({
     preset: 'static',
     prerender: {
       crawlLinks: true,
-      routes: ['/', '/tools/recon', '/tools/cit-profit', '/tools/lexicore', '/tools/tax-planner'],
+      routes: ['/', '/tools/recon', '/tools/cit-profit', '/tools/lexicore', '/tools/tax-planner', '/tools/aging', '/tools/xml-xlate'],
     },
   },
 
@@ -79,15 +79,34 @@ export default defineNuxtConfig({
   },
 
   vite: {
+    css: {
+      // 避免 sass-embedded 原生二进制架构错配（arm64/x64）导致 ENOENT
+      preprocessorOptions: {
+        scss: {
+          api: 'modern',
+        },
+      },
+    },
     server: {
       proxy: {
         '/api': {
           target: process.env.NUXT_BACKEND_URL || 'http://127.0.0.1:8787',
           changeOrigin: true,
-          // 同源代理：去掉浏览器 Origin，避免后端 CORS 白名单绑死前端端口
+          // Long XML translate SSE can run many minutes; never idle-cut the proxy.
+          timeout: 0,
+          proxyTimeout: 0,
           configure(proxy) {
             proxy.on('proxyReq', (proxyReq) => {
               proxyReq.removeHeader('origin')
+            })
+            proxy.on('proxyRes', (proxyRes, _req, res) => {
+              const ct = String(proxyRes.headers['content-type'] || '')
+              if (ct.includes('text/event-stream')) {
+                // Prevent buffering of SSE frames (nginx/vite/http-proxy).
+                res.setHeader('Cache-Control', 'no-cache, no-transform')
+                res.setHeader('X-Accel-Buffering', 'no')
+                res.setHeader('Connection', 'keep-alive')
+              }
             })
           },
         },
@@ -124,6 +143,8 @@ export default defineNuxtConfig({
     { path: '~/components/web3d', pathPrefix: false },
     { path: '~/components/recon', pathPrefix: false },
     { path: '~/components/tax', pathPrefix: false },
+    { path: '~/components/aging', pathPrefix: false },
+    { path: '~/components/xmlxlate', pathPrefix: false },
   ],
 
   imports: {

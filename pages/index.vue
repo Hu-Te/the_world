@@ -54,50 +54,58 @@
 <script setup lang="ts">
 import { getCategory, type ToolCategory, type ToolItem } from '~/utils/tools/catalog'
 
+const SITE_DESC = '深空测控：浏览器直达的精密工具测控台。行业分舱选型，校对与核算结果可核。'
+
 const config = useRuntimeConfig()
+const siteName = computed(() => String(config.public.siteName ?? ''))
+
 const canvasRef = ref<{ closeDrill: () => void } | null>(null)
 const drillCat = ref<ToolCategory | null>(null)
 const tip = ref('')
 let tipTimer = 0
 
 useSeoMeta({
-  title: () => config.public.siteName as string,
-  description: '深空测控：浏览器直达的精密工具测控台。行业分舱选型，校对与核算结果可核。',
-  ogTitle: () => config.public.siteName as string,
+  title: () => siteName.value,
+  description: SITE_DESC,
+  ogTitle: () => siteName.value,
 })
 
-function onDrillOpen(id: string) {
+const clearTip = () => {
   tip.value = ''
   window.clearTimeout(tipTimer)
+}
+
+const showTip = (message: string, ms = 1600) => {
+  clearTip()
+  tip.value = message
+  tipTimer = window.setTimeout(clearTip, ms)
+}
+
+const onDrillOpen = (id: string) => {
+  clearTip()
   drillCat.value = getCategory(id) ?? null
 }
 
-function onDrillClose() {
-  tip.value = ''
-  window.clearTimeout(tipTimer)
+const onDrillClose = () => {
+  clearTip()
   drillCat.value = null
 }
 
-function closeDrill() {
+const closeDrill = () => {
   canvasRef.value?.closeDrill()
 }
 
-function onSelectTool(tool: ToolItem) {
-  if (tool.href?.startsWith('/')) {
-    void navigateTo(tool.href)
+const onSelectTool = (tool: ToolItem) => {
+  const href = tool.href
+  if (href?.startsWith('/')) {
+    void navigateTo(href)
     return
   }
-  if (tool.href) return
-  tip.value = `${tool.name} · ${tool.badge}`
-  window.clearTimeout(tipTimer)
-  tipTimer = window.setTimeout(() => {
-    tip.value = ''
-  }, 1600)
+  if (href) return
+  showTip(`${tool.name} · ${tool.badge}`)
 }
 
-onUnmounted(() => {
-  window.clearTimeout(tipTimer)
-})
+onUnmounted(clearTip)
 </script>
 
 <style scoped lang="scss">
@@ -113,12 +121,14 @@ onUnmounted(() => {
   }
 
   &__brand {
-    @apply pointer-events-none absolute left-5 top-6 z-[2] max-w-[17.5rem] sm:left-8 sm:top-8 sm:max-w-[20rem] lg:left-10;
+    @apply pointer-events-none absolute left-5 top-6 z-[2] max-w-[17.5rem];
+    @apply sm:left-8 sm:top-8 sm:max-w-[20rem] lg:left-10;
     animation: home-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   &__eyebrow {
-    @apply mb-3 flex items-center gap-2 font-mono text-[0.62rem] tracking-[0.2em] text-cyan-soft/70;
+    @apply mb-3 flex items-center gap-2 font-mono text-[0.62rem];
+    @apply tracking-[0.2em] text-cyan-soft/70;
 
     i {
       @apply h-px w-4 bg-cyan-soft/40;
@@ -126,7 +136,8 @@ onUnmounted(() => {
   }
 
   &__title {
-    @apply font-display text-[clamp(2rem,4.6vw,3.1rem)] font-semibold leading-[0.92] tracking-[-0.045em] text-white;
+    @apply font-display text-[clamp(2rem,4.6vw,3.1rem)] font-semibold;
+    @apply leading-[0.92] tracking-[-0.045em] text-white;
     text-shadow: 0 0 40px rgba(110, 200, 232, 0.12);
   }
 
@@ -153,7 +164,8 @@ onUnmounted(() => {
     }
 
     em {
-      @apply shrink-0 font-mono text-[0.58rem] not-italic tracking-[0.14em] text-cyan-soft/55;
+      @apply shrink-0 font-mono text-[0.58rem] not-italic;
+      @apply tracking-[0.14em] text-cyan-soft/55;
     }
 
     span {
@@ -162,7 +174,9 @@ onUnmounted(() => {
   }
 
   &__hud {
-    @apply pointer-events-auto absolute left-5 top-6 z-[3] flex max-w-[min(20rem,calc(100vw-5rem))] items-start gap-4 sm:left-8 sm:top-8 lg:left-10;
+    @apply pointer-events-auto absolute left-5 top-6 z-[3] flex;
+    @apply max-w-[min(20rem,calc(100vw-5rem))] items-start gap-4;
+    @apply sm:left-8 sm:top-8 lg:left-10;
     animation: home-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
@@ -175,12 +189,14 @@ onUnmounted(() => {
   }
 
   &__hud-back {
-    @apply shrink-0 border-b border-cyan-soft/40 pb-0.5 font-mono text-[0.68rem] tracking-[0.18em] text-slate-300 transition;
+    @apply shrink-0 border-b border-cyan-soft/40 pb-0.5 font-mono;
+    @apply text-[0.68rem] tracking-[0.18em] text-slate-300 transition;
     @apply hover:border-cyan-soft hover:text-cyan-soft;
   }
 
   &__tip {
-    @apply pointer-events-none absolute bottom-16 left-1/2 z-[3] -translate-x-1/2 font-mono text-[0.7rem] tracking-[0.14em] text-slate-300;
+    @apply pointer-events-none absolute bottom-16 left-1/2 z-[3];
+    @apply -translate-x-1/2 font-mono text-[0.7rem] tracking-[0.14em] text-slate-300;
     text-shadow: 0 0 20px rgba(110, 200, 232, 0.25);
     animation: home-in 0.25s ease-out both;
   }

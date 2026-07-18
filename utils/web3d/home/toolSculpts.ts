@@ -53,7 +53,7 @@ export function sculptTool(
       break
 
     case 'finance':
-      // 与 catalog 顺序对齐：0 勾稽 / 1 企税倒推 / 2 语料熔炼 / 3 税收扫描
+      // 与 catalog 顺序对齐：0 勾稽 / 1 企税倒推 / 2 语料熔炼 / 3 税收扫描 / 4 往来账龄
       if (index === 0) {
         // 银行存款勾稽：双屏账册 + 配对桥线
         emblem.add(mesh(geos.rbox(0.26, 0.58, 0.06, 0.02, rs), kit.shell, -0.22, 0.02, 0))
@@ -90,7 +90,7 @@ export function sculptTool(
         emblem.add(mesh(geos.rbox(0.42, 0.42, 0.1, 0.03, rs), kit.shell))
         emblem.add(mesh(geos.octahedron(0.1), kit.core, 0, 0.02, 0.08))
         emblem.add(mesh(geos.torus(0.2, 0.012, 8, seg), kit.tip, 0, -0.02, 0))
-      } else {
+      } else if (index === 3) {
         // 税收红利扫描舱：雷达环 + 警示棱锥
         emblem.add(mesh(geos.cylinder(0.28, 0.28, 0.04, seg), kit.shell, 0, -0.2, 0))
         const scan = mesh(geos.torus(0.24, 0.016, 8, seg), kit.tip, 0, -0.08, 0)
@@ -103,6 +103,25 @@ export function sculptTool(
         if (rich) {
           emblem.add(mesh(geos.box(0.02, 0.22, 0.02), kit.tip, 0.26, 0.05, 0))
           emblem.add(mesh(geos.sphere(0.03, 8), kit.core, 0.26, 0.2, 0))
+        }
+      } else {
+        // 往来账龄扫描舱：FIFO 队列阶梯柱（短→长 = 账龄加深）+ 队头冲销箭头
+        const heights = [0.16, 0.28, 0.42, 0.58]
+        for (let i = 0; i < 4; i++) {
+          const h = heights[i]
+          const x = -0.27 + i * 0.18
+          emblem.add(mesh(geos.rbox(0.12, h, 0.12, 0.02, rs), i < 2 ? kit.chrome : kit.shell, x, h / 2 - 0.22, 0))
+          emblem.add(mesh(geos.box(0.08, 0.012, 0.01), i >= 3 ? kit.core : kit.tip, x, h - 0.14, 0.07))
+        }
+        emblem.add(mesh(geos.rbox(0.62, 0.04, 0.2, 0.015, rs), kit.chrome, 0, -0.34, 0))
+        // 队头冲销指示：左侧入队球 → 右侧出队楔
+        emblem.add(mesh(geos.sphere(0.04, 8), kit.tip, -0.36, -0.08, 0.08))
+        emblem.add(mesh(geos.box(0.22, 0.014, 0.014), kit.core, -0.08, -0.08, 0.08))
+        const wedge = mesh(geos.octahedron(0.055), kit.core, 0.34, -0.06, 0.08)
+        wedge.scale.set(1.2, 0.55, 0.55)
+        emblem.add(wedge)
+        if (rich) {
+          emblem.add(mesh(geos.torus(0.3, 0.01, 8, seg), kit.tip, 0, 0.28, 0))
         }
       }
       break
@@ -143,6 +162,37 @@ export function sculptTool(
       break
 
     case 'industry':
+      // 0: XML 多语翻译舱；其余沿用通用工业雕塑
+      if (index === 0) {
+        // 文档页 + 语言分流箭头
+        emblem.add(mesh(geos.rbox(0.42, 0.55, 0.06, 0.02, rs), kit.shell, -0.08, 0.02, 0))
+        for (let i = 0; i < 4; i++) {
+          emblem.add(mesh(geos.box(0.28, 0.012, 0.01), kit.tip, -0.08, -0.14 + i * 0.1, 0.04))
+        }
+        emblem.add(mesh(geos.box(0.18, 0.014, 0.014), kit.core, 0.22, 0.08, 0.02))
+        emblem.add(mesh(geos.octahedron(0.05), kit.core, 0.34, 0.08, 0.02))
+        emblem.add(mesh(geos.sphere(0.035, 8), kit.tip, 0.22, -0.12, 0.04))
+        emblem.add(mesh(geos.sphere(0.035, 8), kit.chrome, 0.34, -0.12, 0.04))
+        if (rich) {
+          emblem.add(mesh(geos.rbox(0.55, 0.04, 0.2, 0.015, rs), kit.chrome, 0, -0.34, 0))
+        }
+      } else if (v === 0) {
+        emblem.add(mesh(geos.rbox(0.55, 0.18, 0.18, 0.03, rs), kit.shell))
+        emblem.add(mesh(geos.cylinder(0.05, 0.05, 0.5, seg), kit.chrome, 0.05, 0.12, 0))
+        emblem.add(mesh(geos.torus(0.1, 0.015, 8, seg), kit.tip, -0.18, 0, 0))
+      } else if (v === 1) {
+        emblem.add(mesh(geos.cylinder(0.22, 0.22, 0.12, seg), kit.chrome))
+        const tooth = mesh(geos.torus(0.26, 0.04, 8, 12), kit.shell)
+        tooth.rotation.x = Math.PI / 2
+        emblem.add(tooth)
+        emblem.add(mesh(geos.sphere(0.06, 8), kit.core))
+      } else {
+        emblem.add(mesh(geos.rbox(0.58, 0.1, 0.42, 0.03, rs), kit.shell, 0, -0.08, 0))
+        emblem.add(mesh(geos.rbox(0.46, 0.06, 0.08, 0.02, rs), kit.crystal, 0, 0.02, 0.12))
+        if (rich) emblem.add(mesh(geos.box(0.3, 0.01, 0.01), kit.tip, 0, 0.08, 0.12))
+      }
+      break
+
     default:
       if (v === 0) {
         emblem.add(mesh(geos.rbox(0.55, 0.18, 0.18, 0.03, rs), kit.shell))

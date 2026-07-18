@@ -38,8 +38,9 @@
         <p v-if="fileName" class="tp-file">{{ fileName }}</p>
       </div>
       <p v-if="report" class="tp-coverage">
-        解析 {{ report.parsedLineCount }} 行 · 纳入测算 {{ report.scoredLineCount }} 行 · 未纳入
-        {{ report.ignoredLineCount }} 行（资产/负债等）
+        解析 {{ report.parsedLineCount }} 行 · 直接计入
+        {{ report.scoredLineCount }} 行（其余
+        {{ report.ignoredLineCount }} 行为资产/负债，或已含在三费根节点内的明细，防重复累加）
         <template v-if="report.amountBasis"> · {{ report.amountBasis }}</template>
       </p>
       <div v-if="report" class="tp-breakdown">

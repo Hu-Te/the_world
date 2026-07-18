@@ -168,11 +168,11 @@ export function buildTools(options: {
   const nodes: ToolNode[] = []
   const pickMeshes: THREE.Mesh[] = []
 
-  // 财务等分类可挂 4 个可用工具；再多仍截断以免轨道重叠
-  const tools = cat.tools.slice(0, 4)
+  // 财务等分类可挂最多 5 个可用工具；再多仍截断以免轨道重叠
+  const tools = cat.tools.slice(0, 5)
   const n = tools.length
   // 围绕工具箱：工具越多半径略加大
-  const orbitR = n <= 2 ? 2.45 : n === 3 ? 2.35 : 2.55
+  const orbitR = n <= 2 ? 2.45 : n === 3 ? 2.35 : n === 4 ? 2.55 : 2.72
   const baseHeight = 0.62
 
   tools.forEach((tool, i) => {

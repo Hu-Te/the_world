@@ -22,9 +22,16 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     id: 'industry',
     code: '01',
     name: '工业与机械制造',
-    desc: '产线、装配与工艺辅助',
+    desc: 'XML 多语翻译 · 产线装配工艺辅助',
     accent: '#6ec8e8',
     tools: [
+      {
+        id: 'industry-xml-xlate',
+        name: '多语言 XML 翻译舱',
+        desc: 'Dom4j 无损解析 · 分片解析 · SSE 进度 · 虚拟表对照',
+        badge: '可用',
+        href: '/tools/xml-xlate',
+      },
       {
         id: 'industry-tol',
         name: '公差配合速查',
@@ -76,7 +83,7 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     id: 'finance',
     code: '03',
     name: '财务与企业数据',
-    desc: '勾稽校对 · 企税倒推 · 语料熔炼 · 税收扫描',
+    desc: '勾稽校对 · 企税倒推 · 语料熔炼 · 税收扫描 · 账龄 FIFO',
     accent: '#6ec4b8',
     tools: [
       {
@@ -106,6 +113,13 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
         desc: '科目余额表多维扫描 · 小微红线 / 招待费 / 研发加计筹划',
         badge: '可用',
         href: '/tools/tax-planner',
+      },
+      {
+        id: 'finance-aging',
+        name: '往来账龄扫描舱',
+        desc: 'FIFO 冲销 · 分桶账龄 · 坏账计提 · 3D 数据岛',
+        badge: '可用',
+        href: '/tools/aging',
       },
     ],
   },
@@ -172,7 +186,12 @@ export function getCategory(id: string): ToolCategory | undefined {
 export function accentToNumber(hex: string): number {
   const h = hex.replace('#', '')
   return Number.parseInt(
-    h.length === 3 ? h.split('').map((c) => c + c).join('') : h,
+    h.length === 3
+      ? h
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h,
     16,
   )
 }

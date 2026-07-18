@@ -10,7 +10,10 @@
       <div class="recon-modal__glow recon-modal__glow--a" aria-hidden="true" />
       <div class="recon-modal__glow recon-modal__glow--b" aria-hidden="true" />
       <div class="recon-modal__frame" aria-hidden="true">
-        <i class="c c--tl" /><i class="c c--tr" /><i class="c c--bl" /><i class="c c--br" />
+        <i class="c c--tl" />
+        <i class="c c--tr" />
+        <i class="c c--bl" />
+        <i class="c c--br" />
       </div>
 
       <!-- 顶栏：始终精简 -->
@@ -107,9 +110,13 @@
                 <span class="recon-file__tag">CORP</span>
                 <span class="recon-file__body">
                   <span class="recon-file__label">企业日记账</span>
-                  <em>{{
-                    corpFiles.length ? `已选 ${corpFiles.length} 个，继续添加` : '可多选 · CSV / Excel'
-                  }}</em>
+                  <em>
+                    {{
+                      corpFiles.length
+                        ? `已选 ${corpFiles.length} 个，继续添加`
+                        : '可多选 · CSV / Excel'
+                    }}
+                  </em>
                 </span>
                 <input
                   type="file"
@@ -133,9 +140,13 @@
                 <span class="recon-file__tag">BANK</span>
                 <span class="recon-file__body">
                   <span class="recon-file__label">银行对账单</span>
-                  <em>{{
-                    bankFiles.length ? `已选 ${bankFiles.length} 个，继续添加` : '可多选 · CSV / Excel'
-                  }}</em>
+                  <em>
+                    {{
+                      bankFiles.length
+                        ? `已选 ${bankFiles.length} 个，继续添加`
+                        : '可多选 · CSV / Excel'
+                    }}
+                  </em>
                 </span>
                 <input
                   type="file"
@@ -184,7 +195,6 @@
                 </label>
               </div>
             </details>
-
           </div>
         </section>
 
@@ -240,9 +250,7 @@
                 @confirm-fuzzy="onConfirmFuzzy" />
             </div>
 
-            <aside
-              v-if="footOpen === 'balance' && detail.balanceSheet"
-              class="recon-drawer">
+            <aside v-if="footOpen === 'balance' && detail.balanceSheet" class="recon-drawer">
               <header>
                 <h2>余额调节</h2>
                 <button type="button" class="recon-drawer__x" @click="footOpen = null">✕</button>
@@ -279,14 +287,11 @@
                 <button type="button" class="recon-drawer__x" @click="footOpen = null">✕</button>
               </header>
               <ul class="recon-aside__suggest">
-                <li
-                  v-for="(s, i) in visibleAiSuggestions"
-                  :key="`${s.corpId}-${s.bankId}-${i}`">
+                <li v-for="(s, i) in visibleAiSuggestions" :key="`${s.corpId}-${s.bankId}-${i}`">
                   <button type="button" :disabled="busy" @click="applyAi(s)">
-                    <strong
-                      >#{{ s.corpId }} ↔ #{{ s.bankId }} ·
-                      {{ Math.round(s.confidence * 100) }}%</strong
-                    >
+                    <strong>
+                      #{{ s.corpId }} ↔ #{{ s.bankId }} · {{ Math.round(s.confidence * 100) }}%
+                    </strong>
                     <span>{{ s.reason }}</span>
                   </button>
                 </li>
@@ -319,12 +324,7 @@ import {
   getReconAccessToken,
   saveReconAccessToken,
 } from '~/utils/recon/session'
-import type {
-  AiSuggestion,
-  ReconFilter,
-  ReconId,
-  ReconTaskDetail,
-} from '~/utils/recon/types'
+import type { AiSuggestion, ReconFilter, ReconId, ReconTaskDetail } from '~/utils/recon/types'
 import { isFuzzyMatch, isLockedMatch, isReconId } from '~/utils/recon/types'
 
 definePageMeta({ layout: false })
@@ -517,12 +517,7 @@ async function runPipeline() {
 
     taskId.value = createdId
     phase.value = `上传解析…（企业 ${corpFiles.value.length} · 银行 ${bankFiles.value.length}）`
-    await uploadReconFiles(
-      createdId,
-      corpFiles.value,
-      bankFiles.value,
-      buildColumnMap(),
-    )
+    await uploadReconFiles(createdId, corpFiles.value, bankFiles.value, buildColumnMap())
     if (seq !== actionSeq) return
 
     phase.value = '规则勾对…'
@@ -667,10 +662,7 @@ async function onConfirmFuzzy(groupId: ReconId) {
 
 async function applyAi(s: AiSuggestion) {
   if (!taskId.value || busy.value) return
-  if (
-    occupiedEntryIds.value.has(s.corpId) ||
-    occupiedEntryIds.value.has(s.bankId)
-  ) {
+  if (occupiedEntryIds.value.has(s.corpId) || occupiedEntryIds.value.has(s.bankId)) {
     return
   }
   await onManualLink([s.corpId], [s.bankId])
@@ -702,17 +694,20 @@ onUnmounted(() => {
 </script>
 
 <style scoped lang="scss">
-$glow-soft: 0 0 10px rgba(110, 200, 232, 0.35), 0 0 2px rgba(180, 230, 250, 0.4);
-$glow-strong: 0 0 14px rgba(110, 200, 232, 0.55), 0 0 4px rgba(190, 235, 255, 0.6);
-$glow-title: 0 0 18px rgba(110, 200, 232, 0.45), 0 0 6px rgba(220, 245, 255, 0.5);
+$glow-soft:
+  0 0 10px rgba(110, 200, 232, 0.35),
+  0 0 2px rgba(180, 230, 250, 0.4);
+$glow-strong:
+  0 0 14px rgba(110, 200, 232, 0.55),
+  0 0 4px rgba(190, 235, 255, 0.6);
+$glow-title:
+  0 0 18px rgba(110, 200, 232, 0.45),
+  0 0 6px rgba(220, 245, 255, 0.5);
 
 .recon-shell {
   @apply fixed inset-0 z-[60] flex items-center justify-center;
-  padding:
-    max(0.5rem, env(safe-area-inset-top))
-    max(0.5rem, env(safe-area-inset-right))
-    max(0.5rem, env(safe-area-inset-bottom))
-    max(0.5rem, env(safe-area-inset-left));
+  padding: max(0.5rem, env(safe-area-inset-top)) max(0.5rem, env(safe-area-inset-right))
+    max(0.5rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));
   background:
     radial-gradient(ellipse 65% 45% at 50% -8%, rgba(110, 200, 232, 0.14), transparent 55%),
     rgba(2, 6, 12, 0.84);
@@ -787,10 +782,18 @@ $glow-title: 0 0 18px rgba(110, 200, 232, 0.45), 0 0 6px rgba(220, 245, 255, 0.5
       @apply absolute h-3 w-3 sm:h-3.5 sm:w-3.5;
       border-color: rgba(110, 200, 232, 0.55);
       border-style: solid;
-      &--tl { @apply left-2 top-2 border-l border-t sm:left-2.5 sm:top-2.5; }
-      &--tr { @apply right-2 top-2 border-r border-t sm:right-2.5 sm:top-2.5; }
-      &--bl { @apply bottom-2 left-2 border-b border-l sm:bottom-2.5 sm:left-2.5; }
-      &--br { @apply bottom-2 right-2 border-b border-r sm:bottom-2.5 sm:right-2.5; }
+      &--tl {
+        @apply left-2 top-2 border-l border-t sm:left-2.5 sm:top-2.5;
+      }
+      &--tr {
+        @apply right-2 top-2 border-r border-t sm:right-2.5 sm:top-2.5;
+      }
+      &--bl {
+        @apply bottom-2 left-2 border-b border-l sm:bottom-2.5 sm:left-2.5;
+      }
+      &--br {
+        @apply bottom-2 right-2 border-b border-r sm:bottom-2.5 sm:right-2.5;
+      }
     }
   }
 
@@ -974,7 +977,7 @@ $glow-title: 0 0 18px rgba(110, 200, 232, 0.45), 0 0 6px rgba(220, 245, 255, 0.5
 }
 
 .recon-tools {
-  @apply flex flex-wrap items-center gap-2 sm:gap-3 pt-0.5;
+  @apply flex flex-wrap items-center gap-2 pt-0.5 sm:gap-3;
 }
 
 .recon-file-slot {
@@ -993,14 +996,12 @@ $glow-title: 0 0 18px rgba(110, 200, 232, 0.45), 0 0 6px rgba(220, 245, 255, 0.5
   @apply rounded-lg border border-dashed border-white/20 px-4 py-4 transition duration-300 sm:px-5 sm:py-5;
   min-height: clamp(7.5rem, 22vw, 13rem);
   background:
-    linear-gradient(155deg, rgba(110, 200, 232, 0.07), transparent 60%),
-    rgba(0, 0, 0, 0.3);
+    linear-gradient(155deg, rgba(110, 200, 232, 0.07), transparent 60%), rgba(0, 0, 0, 0.3);
 
   &:hover {
     border-color: rgba(110, 200, 232, 0.48);
     background:
-      linear-gradient(155deg, rgba(110, 200, 232, 0.12), transparent 60%),
-      rgba(0, 0, 0, 0.3);
+      linear-gradient(155deg, rgba(110, 200, 232, 0.12), transparent 60%), rgba(0, 0, 0, 0.3);
   }
 
   &--on {
@@ -1239,8 +1240,12 @@ $glow-title: 0 0 18px rgba(110, 200, 232, 0.45), 0 0 6px rgba(220, 245, 255, 0.5
 }
 
 @keyframes recon-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes recon-up {
@@ -1255,19 +1260,41 @@ $glow-title: 0 0 18px rgba(110, 200, 232, 0.45), 0 0 6px rgba(220, 245, 255, 0.5
 }
 
 @keyframes recon-pulse {
-  0%, 100% { opacity: 0.4; transform: scale(0.9); }
-  50% { opacity: 1; transform: scale(1.12); }
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
 }
 
 @keyframes recon-shine {
-  0%, 55% { transform: translateX(0); opacity: 0; }
-  70% { opacity: 1; }
-  100% { transform: translateX(320%); opacity: 0; }
+  0%,
+  55% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(320%);
+    opacity: 0;
+  }
 }
 
 @keyframes recon-drawer {
-  from { transform: translateX(12px); opacity: 0; }
-  to { transform: none; opacity: 1; }
+  from {
+    transform: translateX(12px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

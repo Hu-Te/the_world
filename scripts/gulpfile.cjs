@@ -11,14 +11,10 @@ const gulp = require('gulp')
 const SftpClient = require('ssh2-sftp-client')
 
 /** SFTP 上传暂存目录（ubuntu 可写） */
-const STAGE_PATH = (
-  process.env.DEPLOY_STAGE || '/home/ubuntu/_deploy/three-city'
-).trim()
+const STAGE_PATH = (process.env.DEPLOY_STAGE || '/home/ubuntu/_deploy/three-city').trim()
 
 /** Nginx 站点根目录（须与线上 nginx root 一致） */
-const NGINX_PATH = (
-  process.env.DEPLOY_PATH || '/home/ubuntu/_deploy/three-city'
-).trim()
+const NGINX_PATH = (process.env.DEPLOY_PATH || '/home/ubuntu/_deploy/three-city').trim()
 
 /** Linux 服务器 SFTP 配置 */
 const server = {
@@ -41,9 +37,7 @@ function assertServerConfig() {
     throw new Error('请在 deploy.env 中设置 DEPLOY_PASS')
   }
   if (server.user === 'root') {
-    console.warn(
-      '[deploy] 提示：腾讯云 Ubuntu 镜像通常用 ubuntu 账号，root 密码登录可能失败',
-    )
+    console.warn('[deploy] 提示：腾讯云 Ubuntu 镜像通常用 ubuntu 账号，root 密码登录可能失败')
   }
 }
 
@@ -163,9 +157,7 @@ function uploadDev(done) {
 
   const distDir = resolve(ROOT, '.output/public')
   if (!existsSync(distDir)) {
-    done(
-      new Error('.output/public 不存在，请先执行 gulp build / nuxt generate'),
-    )
+    done(new Error('.output/public 不存在，请先执行 gulp build / nuxt generate'))
     return
   }
 
@@ -210,9 +202,7 @@ function testAuth(done) {
       console.log(`[deploy] 认证成功: ${server.user}@${server.host}`)
       done()
     })
-    .catch((err) =>
-      done(new Error(`认证失败: ${err.message}（腾讯云请用 ubuntu 账号）`)),
-    )
+    .catch((err) => done(new Error(`认证失败: ${err.message}（腾讯云请用 ubuntu 账号）`)))
 }
 
 gulp.task('test-auth', testAuth)
@@ -223,8 +213,5 @@ gulp.task('prepare-remote', prepareRemote)
 gulp.task('upload-dev', uploadDev)
 gulp.task('sync-release', syncRelease)
 /** 生产默认：Nuxt 静态前端（API 由 Java 提供，Nginx /api 反代） */
-gulp.task(
-  'deploy',
-  gulp.series('build-only', 'prepare-remote', 'upload-dev', 'sync-release'),
-)
+gulp.task('deploy', gulp.series('build-only', 'prepare-remote', 'upload-dev', 'sync-release'))
 gulp.task('default', gulp.series('deploy'))

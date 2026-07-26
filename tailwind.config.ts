@@ -24,13 +24,14 @@ export default {
       },
       fontFamily: {
         display: [
-          '"IBM Plex Sans SC"',
           '"PingFang SC"',
+          '"Hiragino Sans GB"',
           '"Noto Sans SC"',
+          '"Microsoft YaHei"',
           'system-ui',
           'sans-serif',
         ],
-        mono: ['"IBM Plex Mono"', '"SF Mono"', 'ui-monospace', 'monospace'],
+        mono: ['"SF Mono"', 'ui-monospace', 'Menlo', 'Consolas', 'monospace'],
       },
       boxShadow: {
         panel: '0 20px 48px rgba(0, 0, 0, 0.45)',

@@ -161,6 +161,7 @@ export class HomeHeroManager {
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
+      // 桌面开抗锯齿；手机关以省 GPU（DPR 已提到 2，边缘仍可接受）
       antialias: this.quality.device === 'desktop',
       alpha: false,
       powerPreference: 'high-performance',
@@ -233,12 +234,8 @@ export class HomeHeroManager {
     this.hubAnim.spark = this.hub.getObjectByName('hubSpark') ?? null
     this.hubAnim.floorGlow = (this.hub.getObjectByName('hubFloorGlow') as THREE.Mesh | undefined) ?? null
 
-    const built = buildCategories(this.scene, this.geos, this.quality, pushTex)
-    this.categories.push(...built.nodes)
-    this.disposeCategoryOwned = built.disposeOwned
-    for (const c of this.categories) this.pickMeshes.push(c.pick)
-
-    this.particles = buildParticles(this.quality.particleCount)
+    // 先挂轻量粒子并开渲，分类雕塑下一帧再补（缩短黑屏等待）
+    this.particles = buildParticles(Math.min(28, this.quality.particleCount))
     this.scene.add(this.particles)
 
     canvas.style.cursor = 'grab'
@@ -251,6 +248,16 @@ export class HomeHeroManager {
 
     this.updateFacingFocus(true)
     this.tick()
+
+    requestAnimationFrame(() => {
+      if (this.disposed) return
+      const built = buildCategories(this.scene, this.geos, this.quality, pushTex)
+      this.categories.push(...built.nodes)
+      this.disposeCategoryOwned = built.disposeOwned
+      for (const c of this.categories) this.pickMeshes.push(c.pick)
+      this.needsRender = true
+      this.updateFacingFocus(true)
+    })
   }
 
   get isDrilling(): boolean {

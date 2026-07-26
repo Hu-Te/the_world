@@ -22,7 +22,7 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     id: 'industry',
     code: '01',
     name: '工业与机械制造',
-    desc: 'XML 多语翻译 · 产线装配工艺辅助',
+    desc: 'XML 多语翻译 · S7 工脉监听 · 产线装配辅助',
     accent: '#6ec8e8',
     tools: [
       {
@@ -33,10 +33,11 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
         href: '/tools/xml-xlate',
       },
       {
-        id: 'industry-tol',
-        name: '公差配合速查',
-        desc: '常用公差带与配合代号对照',
-        badge: '筹备中',
+        id: 'industry-fieldpulse',
+        name: '工脉监听舱',
+        desc: 'S7/Modbus/Hex · 连接缓存 · WS 节流推送 · 实时点表',
+        badge: '内测',
+        href: '/tools/fieldpulse',
       },
       {
         id: 'industry-bom',
@@ -165,9 +166,10 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
       },
       {
         id: 'commerce-pack',
-        name: '包装展开估算',
-        desc: '盒型展开面积粗算',
-        badge: '筹备中',
+        name: '软包装 3D 打样',
+        desc: '展开蓝图 OCR → 尺寸闭环 → 程序化软包网格',
+        badge: '内测',
+        href: '/tools/pack-3d',
       },
       {
         id: 'commerce-color',

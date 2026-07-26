@@ -162,7 +162,7 @@ export function sculptTool(
       break
 
     case 'industry':
-      // 0: XML 多语翻译舱；其余沿用通用工业雕塑
+      // 0: XML 多语翻译舱；1: 工脉监听舱；其余沿用通用工业雕塑
       if (index === 0) {
         // 文档页 + 语言分流箭头
         emblem.add(mesh(geos.rbox(0.42, 0.55, 0.06, 0.02, rs), kit.shell, -0.08, 0.02, 0))
@@ -175,6 +175,16 @@ export function sculptTool(
         emblem.add(mesh(geos.sphere(0.035, 8), kit.chrome, 0.34, -0.12, 0.04))
         if (rich) {
           emblem.add(mesh(geos.rbox(0.55, 0.04, 0.2, 0.015, rs), kit.chrome, 0, -0.34, 0))
+        }
+      } else if (index === 1) {
+        // 工控网关：底座 + 信号柱 + 环形脉冲
+        emblem.add(mesh(geos.rbox(0.5, 0.12, 0.36, 0.03, rs), kit.shell, 0, -0.16, 0))
+        emblem.add(mesh(geos.cylinder(0.06, 0.08, 0.42, seg), kit.chrome, 0, 0.1, 0))
+        emblem.add(mesh(geos.torus(0.18, 0.02, 8, seg), kit.tip, 0, 0.22, 0))
+        emblem.add(mesh(geos.sphere(0.05, 8), kit.core, 0, 0.34, 0))
+        if (rich) {
+          emblem.add(mesh(geos.box(0.22, 0.01, 0.01), kit.tip, 0.18, 0.02, 0.08))
+          emblem.add(mesh(geos.box(0.22, 0.01, 0.01), kit.tip, -0.18, 0.02, 0.08))
         }
       } else if (v === 0) {
         emblem.add(mesh(geos.rbox(0.55, 0.18, 0.18, 0.03, rs), kit.shell))

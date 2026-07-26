@@ -7,11 +7,11 @@ import type { Object3D, Mesh, BufferGeometry } from 'three'
 /** 同时存在的 WebGLRenderer 上限（含隐藏页） */
 export const MAX_WEBGL_CONTEXTS = 1
 
-/** 手机 / 粗指针设备的 DPR 上限 */
-export const PIXEL_RATIO_CAP_MOBILE = 1.25
+/** 手机 / 粗指针设备的 DPR 上限（过低会糊） */
+export const PIXEL_RATIO_CAP_MOBILE = 2
 
-/** 桌面 DPR 上限 */
-export const PIXEL_RATIO_CAP_DESKTOP = 1.5
+/** 桌面 DPR 上限：对齐常见 Retina(=2)，避免整幅 canvas 被拉伸发糊 */
+export const PIXEL_RATIO_CAP_DESKTOP = 2
 
 /** 默认关闭实时阴影 */
 export const ENABLE_SHADOWS_DEFAULT = false

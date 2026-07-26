@@ -33,17 +33,13 @@ function apiBase(): string {
   return origin.replace(/\/$/, '')
 }
 
-function apiToken(): string {
-  const config = useRuntimeConfig()
-  return (config.public.apiToken as string) || ''
-}
-
 function authHeaders(json: boolean): Headers {
   const headers = new Headers()
   if (json) headers.set('Content-Type', 'application/json')
   headers.set('Accept', json ? 'text/event-stream, application/json' : 'application/json')
-  const token = apiToken()
-  if (token) headers.set('X-API-Token', token)
+  const auth = useAuthStore()
+  if (import.meta.client) auth.hydrate()
+  if (auth.accessToken) headers.set('Authorization', `Bearer ${auth.accessToken}`)
   return headers
 }
 
@@ -127,7 +123,8 @@ export async function translateXmlStream(
       const { pct } = parseProgress(payload?.progress || '')
       if (pct >= 100) {
         sawTerminalProgress = true
-        // Do not wait for a possibly-dropped "done" frame on long streams / proxies.
+        // Progress frame already delivered last batch via onProgress above.
+        // Do not cancel mid-flush; finish after this event so UI can still finalize coverage.
         handlers.onDone?.()
         void finish()
       }
@@ -173,10 +170,8 @@ export async function exportTranslatedXml(body: {
   translationsByTag?: Record<string, Record<string, string>>
 }): Promise<Blob> {
   const url = `${apiBase()}/api/xml-xlate/export`
-  const headers = new Headers({ Accept: 'application/xml, application/json' })
-  headers.set('Content-Type', 'application/json')
-  const token = apiToken()
-  if (token) headers.set('X-API-Token', token)
+  const headers = authHeaders(true)
+  headers.set('Accept', 'application/xml, application/json')
   const res = await fetch(url, {
     method: 'POST',
     headers,

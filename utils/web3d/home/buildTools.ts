@@ -39,7 +39,7 @@ function makeToolLabel(
   accent: number,
   pushTexture: (t: THREE.Texture) => void,
 ): THREE.Sprite {
-  const dpr = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2.5)
+  const dpr = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 3)
   const scale = Math.max(2, Math.round(dpr * 2))
 
   const fontName =
@@ -69,7 +69,8 @@ function makeToolLabel(
 
   const ctx = c.getContext('2d')!
   ctx.setTransform(scale, 0, 0, scale, 0, 0)
-  ctx.imageSmoothingEnabled = false
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
 
   const accentHex = `#${accent.toString(16).padStart(6, '0')}`
   ctx.beginPath()

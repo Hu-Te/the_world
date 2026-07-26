@@ -121,15 +121,15 @@ function resolveNodeBin() {
 
 /** Nuxt generate → .output/public（优先 Node 20+） */
 function buildOnly(done) {
-  // 与 Java website.env 的 APP_API_TOKEN 对齐；勿把 DeepSeek key 打进前端
-  if (!process.env.NUXT_PUBLIC_API_TOKEN && process.env.APP_API_TOKEN) {
-    process.env.NUXT_PUBLIC_API_TOKEN = process.env.APP_API_TOKEN
+  // 禁止把 APP_API_TOKEN 注入 NUXT_PUBLIC_*（会打进浏览器包）
+  if (process.env.NUXT_PUBLIC_API_TOKEN) {
+    console.warn(
+      '[deploy] NUXT_PUBLIC_API_TOKEN 已废弃且有泄露风险，已忽略；工具 API 使用用户 JWT，Agent 使用本机 APP_API_TOKEN',
+    )
+    delete process.env.NUXT_PUBLIC_API_TOKEN
   }
   const nodeBin = resolveNodeBin()
   console.log(`[deploy] nuxt generate with ${nodeBin}`)
-  console.log(
-    `[deploy] NUXT_PUBLIC_API_TOKEN ${process.env.NUXT_PUBLIC_API_TOKEN ? 'set' : 'empty'}`,
-  )
   run(`"${nodeBin}" ./node_modules/nuxt/bin/nuxt.mjs generate`)
   done()
 }

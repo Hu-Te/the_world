@@ -40,17 +40,13 @@ function apiBase(): string {
   return origin.replace(/\/$/, '')
 }
 
-function apiToken(): string {
-  const config = useRuntimeConfig()
-  return (config.public.apiToken as string) || ''
-}
-
 function authHeaders(json = true): Headers {
   const headers = new Headers()
   if (json) headers.set('Content-Type', 'application/json')
   headers.set('Accept', json ? 'text/event-stream, application/json' : 'application/json')
-  const token = apiToken()
-  if (token) headers.set('X-API-Token', token)
+  const auth = useAuthStore()
+  if (import.meta.client) auth.hydrate()
+  if (auth.accessToken) headers.set('Authorization', `Bearer ${auth.accessToken}`)
   return headers
 }
 

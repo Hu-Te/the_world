@@ -27,9 +27,13 @@
             :key="t"
             type="button"
             class="xx-chip"
-            :class="{ 'is-active': activeTarget === t, 'is-done': translatedTags.has(t) }"
+            :class="{
+              'is-active': activeTarget === t,
+              'is-done': completedTags.has(t),
+              'is-partial': exportableTags.has(t) && !completedTags.has(t),
+            }"
             @click="activeTarget = t">
-            {{ t }}{{ translatedTags.has(t) ? ' ✓' : '' }}
+            {{ t }}{{ completedTags.has(t) ? ' ✓' : exportableTags.has(t) ? ' …' : '' }}
           </button>
           <span v-if="!targetTags.length" class="xx-chips__empty">上传后自动识别目标标签</span>
         </div>
@@ -46,12 +50,18 @@
           class="xx-btn xx-btn--primary"
           :disabled="busy || !sessionId || !sourceTag || !activeTarget"
           @click="runTranslate">
-          {{ busy ? `翻译进行中… ${progressLabel || ''}`.trim() : `翻译「${activeTarget || '目标'}」列` }}
+          {{
+            busy
+              ? `翻译进行中… ${progressLabel || ''}`.trim()
+              : isTraditionalChineseTag(activeTarget)
+                ? `转换「${activeTarget || '繁体'}」列（本地简繁）`
+                : `翻译「${activeTarget || '目标'}」列`
+          }}
         </button>
         <button
           type="button"
           class="xx-btn xx-btn--ghost xx-btn--block"
-          :disabled="!sessionId || busy || !translatedTags.size"
+          :disabled="!sessionId || busy || !exportableTags.size"
           @click="runExport">
           导出 XML（仅回写已译标签：{{ exportTagSummary }}）
         </button>
@@ -64,7 +74,12 @@
           <div class="xx-progress__bar" :style="{ width: progressPct + '%' }" />
           <span class="xx-progress__label">{{ progressLabel || '准备中' }} · {{ progressPct }}%</span>
         </div>
-        <p v-else-if="lastDoneTag" class="xx-ok">「{{ lastDoneTag }}」列已完成 · {{ translatedSummary }}</p>
+        <p v-else-if="lastDoneTag && completedTags.has(lastDoneTag)" class="xx-ok">
+          「{{ lastDoneTag }}」列已完成 · {{ translatedSummary }}
+        </p>
+        <p v-else-if="lastDoneTag" class="xx-warn">
+          「{{ lastDoneTag }}」列未全覆盖 · {{ translatedSummary }}
+        </p>
 
         <p v-if="error" class="xx-err">{{ error }}</p>
         <p v-else-if="sessionId" class="xx-meta">
@@ -122,6 +137,12 @@ import {
   validateXmlUpload,
   type XmlRow,
 } from '~/utils/xmlxlate/api'
+import {
+  columnCoverage,
+  isTraditionalChineseTag,
+  pendingEntryIds,
+  traditionalConvertIds,
+} from '~/utils/xmlxlate/coverage'
 
 const XmlVirtualTable = defineAsyncComponent(() => import('./XmlVirtualTable.client.vue'))
 
@@ -136,33 +157,51 @@ const error = ref('')
 const progressLabel = ref('')
 const progressPct = ref(0)
 const lastDoneTag = ref('')
-/** tags translated in this browser session (export only these, not raw source leftovers) */
-const translatedTags = ref<Set<string>>(new Set())
+/** 本会话已有译文、可参与导出的标签（未必全覆盖） */
+const exportableTags = ref<Set<string>>(new Set())
+/** 全表覆盖完成的目标列 */
+const completedTags = ref<Set<string>>(new Set())
+/** 本会话已跑过本地简繁的标签（避免同形字反复待译 / 误标完成） */
+const traditionalConvertedTags = ref<Set<string>>(new Set())
 
 /** shallowRef: skip deep proxy on large tables */
 const rows = shallowRef<XmlRow[]>([])
 
 const targetTags = computed(() => languageTags.value.filter((t) => t !== sourceTag.value))
 
+function covOpts(tag: string) {
+  return { traditionalAlreadyConverted: traditionalConvertedTags.value.has(tag) }
+}
+
+function coverageOf(tag: string, source: string) {
+  return columnCoverage(rows.value, tag, source, covOpts(tag))
+}
+
 const translatedSummary = computed(() => {
-  const done = targetTags.value.filter((t) => translatedTags.value.has(t))
-  const pending = targetTags.value.filter((t) => !translatedTags.value.has(t))
-  if (!done.length) return '尚未翻译任何目标列'
+  const done = targetTags.value.filter((t) => completedTags.value.has(t))
+  const pending = targetTags.value.filter((t) => !completedTags.value.has(t))
+  const partial = pending.filter((t) => exportableTags.value.has(t))
+  if (!done.length && !partial.length) return '尚未翻译任何目标列'
   if (!pending.length) return `已全部译完：${done.join('、')}`
-  return `已译 ${done.join('、')} · 待译 ${pending.join('、')}`
+  const bits: string[] = []
+  if (done.length) bits.push(`已完成 ${done.join('、')}`)
+  if (partial.length) bits.push(`未完成 ${partial.join('、')}`)
+  const idle = pending.filter((t) => !exportableTags.value.has(t))
+  if (idle.length) bits.push(`待译 ${idle.join('、')}`)
+  return bits.join(' · ')
 })
 
 const exportTagSummary = computed(() => {
-  const done = targetTags.value.filter((t) => translatedTags.value.has(t))
-  return done.length ? done.join('+') : '无'
+  const tags = targetTags.value.filter((t) => exportableTags.value.has(t))
+  return tags.length ? tags.join('+') : '无'
 })
 
 const translateEta = computed(() => {
   const n = rows.value.length || 0
   if (!n) return '上传后开始'
-  // ~50/batch, ~2.5s/batch incl. rate limit
-  const minutes = Math.max(1, Math.ceil((n / 50) * 2.5 / 60))
-  return `${n} 条预计 ${minutes}–${minutes + 2} 分钟`
+  if (isTraditionalChineseTag(activeTarget.value)) return `${n} 条本地简繁，通常数秒内完成`
+  const minutes = Math.max(1, Math.ceil((n / 120) * 2.5 / 60))
+  return `${n} 条预计约 ${minutes}–${minutes + 2} 分钟`
 })
 
 const columns = computed<Column<XmlRow>[]>(() => {
@@ -181,6 +220,17 @@ const columns = computed<Column<XmlRow>[]>(() => {
 watch(sourceTag, (s) => {
   if (activeTarget.value === s || !targetTags.value.includes(activeTarget.value)) {
     activeTarget.value = targetTags.value[0] || ''
+  }
+})
+
+/** 切换目标列时按实表重算完成态，避免误标 ✓ 后点不动 */
+watch(activeTarget, (tag) => {
+  if (!tag || !sourceTag.value) return
+  const cov = coverageOf(tag, sourceTag.value)
+  if (!cov.complete && completedTags.value.has(tag)) {
+    const next = new Set(completedTags.value)
+    next.delete(tag)
+    completedTags.value = next
   }
 })
 
@@ -205,7 +255,9 @@ async function ingest() {
   error.value = ''
   progressPct.value = 0
   lastDoneTag.value = ''
-  translatedTags.value = new Set()
+  exportableTags.value = new Set()
+  completedTags.value = new Set()
+  traditionalConvertedTags.value = new Set()
   try {
     const res = await uploadXmlLedger(file.value)
     sessionId.value = res.sessionId
@@ -227,20 +279,76 @@ async function runTranslate() {
   if (!sessionId.value || !sourceTag.value || !activeTarget.value) return
   const target = activeTarget.value
   const source = sourceTag.value
+  // 繁体：始终全量本地转换（可重复点）；其它语言只补待译行
+  const entryIds = isTraditionalChineseTag(target)
+    ? traditionalConvertIds(rows.value, source)
+    : pendingEntryIds(rows.value, target, source, covOpts(target))
+  if (!entryIds.length) {
+    lastDoneTag.value = target
+    const cov = coverageOf(target, source)
+    if (cov.complete) {
+      const nextDone = new Set(completedTags.value)
+      nextDone.add(target)
+      completedTags.value = nextDone
+      progressPct.value = 100
+      error.value = ''
+    } else {
+      error.value = `「${target}」列暂无待处理词条，请检查源列是否为空。`
+    }
+    return
+  }
+  await executeTranslate(target, source, entryIds)
+}
+
+async function executeTranslate(target: string, source: string, entryIds: string[]) {
   busy.value = true
   error.value = ''
   progressPct.value = 0
-  progressLabel.value = `0/? · ${target}`
-  let marked = false
-  const markDone = () => {
-    if (marked) return
-    marked = true
+  progressLabel.value = `0/${entryIds.length} · ${target}`
+  {
+    const nextDone = new Set(completedTags.value)
+    nextDone.delete(target)
+    completedTags.value = nextDone
+  }
+  let finalized = false
+  const finalizeColumn = () => {
+    if (finalized) return
+    finalized = true
     busy.value = false
-    progressPct.value = 100
     lastDoneTag.value = target
-    const next = new Set(translatedTags.value)
-    next.add(target)
-    translatedTags.value = next
+    if (isTraditionalChineseTag(target)) {
+      const nextConv = new Set(traditionalConvertedTags.value)
+      nextConv.add(target)
+      traditionalConvertedTags.value = nextConv
+    }
+    const cov = coverageOf(target, source)
+    const realFilled = Math.max(0, cov.filled - cov.sameAsSource)
+    progressPct.value =
+      cov.need > 0 ? Math.min(100, Math.round((realFilled / cov.need) * 100)) : progressPct.value
+
+    if (cov.filled > 0 && (isTraditionalChineseTag(target) || cov.filled > cov.sameAsSource)) {
+      const nextExp = new Set(exportableTags.value)
+      nextExp.add(target)
+      exportableTags.value = nextExp
+    }
+
+    if (cov.complete) {
+      const nextDone = new Set(completedTags.value)
+      nextDone.add(target)
+      completedTags.value = nextDone
+      progressPct.value = 100
+      error.value = ''
+    } else {
+      const nextDone = new Set(completedTags.value)
+      nextDone.delete(target)
+      completedTags.value = nextDone
+      const gap = isTraditionalChineseTag(target)
+        ? `「${target}」列未转完：仍有 ${cov.pending} 条待处理。请再点一次转换。`
+        : cov.sameAsSource > 0
+          ? `「${target}」列未全覆盖：有效译 ${realFilled}/${cov.need}，另有 ${cov.sameAsSource} 条仍照抄源文。请再次点击翻译补齐。`
+          : `「${target}」列未译完：已填 ${cov.filled}/${cov.need}。请再次点击翻译该列补齐。`
+      error.value = error.value ? `${error.value}（${realFilled}/${cov.need}）` : gap
+    }
   }
   try {
     await translateXmlStream(
@@ -248,11 +356,12 @@ async function runTranslate() {
         sessionId: sessionId.value,
         sourceTag: source,
         targetTag: target,
+        entryIds,
       },
       {
         onProgress: (p) => {
           const { pct, done, total } = parseProgress(p.progress)
-          progressPct.value = pct
+          progressPct.value = Math.min(99, pct)
           progressLabel.value = `${done}/${total} · ${target}`
           if (p.data?.length) {
             const patch = new Map(p.data.map((d) => [d.id, decodeXmlEntities(d.text ?? '')]))
@@ -261,50 +370,67 @@ async function runTranslate() {
               return t == null ? row : { ...row, [target]: t }
             })
             triggerRef(rows)
-            // As soon as server stored a batch, allow export of this tag
-            if (!translatedTags.value.has(target)) {
-              const next = new Set(translatedTags.value)
+            if (!exportableTags.value.has(target)) {
+              const next = new Set(exportableTags.value)
               next.add(target)
-              translatedTags.value = next
+              exportableTags.value = next
             }
           }
-          if (pct >= 100) markDone()
         },
-        onDone: () => markDone(),
+        onDone: () => finalizeColumn(),
         onError: (msg) => {
           error.value = msg
         },
       },
     )
-    markDone()
-    // Warn if target column still mostly equals source (model copied Chinese)
-    const sample = rows.value.slice(0, 40)
-    let same = 0
-    let compared = 0
-    for (const row of sample) {
-      const s = (row[source] || '').trim()
-      const t = (row[target] || '').trim()
-      if (!s) continue
-      compared++
-      if (s === t) same++
-    }
-    if (compared >= 8 && same / compared >= 0.7) {
-      error.value =
-        `「${target}」列多数仍与「${source}」相同，可能模型未真正翻译。请重试翻译该列；导出前请确认对照表已是目标语言。`
-    }
+    finalizeColumn()
   } catch (err: unknown) {
-    error.value = err instanceof Error ? err.message : '翻译失败'
+    const msg = err instanceof Error ? err.message : '翻译失败'
+    if (!error.value) error.value = msg
+    if (!finalized) {
+      lastDoneTag.value = target
+      if (isTraditionalChineseTag(target)) {
+        const nextConv = new Set(traditionalConvertedTags.value)
+        nextConv.add(target)
+        traditionalConvertedTags.value = nextConv
+      }
+      const cov = coverageOf(target, source)
+      if (cov.filled > cov.sameAsSource || isTraditionalChineseTag(target)) {
+        const nextExp = new Set(exportableTags.value)
+        nextExp.add(target)
+        exportableTags.value = nextExp
+      }
+      const nextDone = new Set(completedTags.value)
+      nextDone.delete(target)
+      completedTags.value = nextDone
+      const realFilled = Math.max(0, cov.filled - cov.sameAsSource)
+      if (!error.value) {
+        error.value = `「${target}」列未译完：有效译 ${realFilled}/${cov.need}`
+      } else if (cov.need > 0 && realFilled < cov.need) {
+        error.value = `${msg}（有效译 ${realFilled}/${cov.need}）`
+      }
+      finalized = true
+    }
   } finally {
     busy.value = false
   }
 }
 
 async function runExport() {
-  if (!sessionId.value || !translatedTags.value.size) return
+  if (!sessionId.value || !exportableTags.value.size) return
   error.value = ''
+  const incomplete = targetTags.value.filter(
+    (t) => exportableTags.value.has(t) && !completedTags.value.has(t),
+  )
+  if (incomplete.length) {
+    const ok = confirm(
+      `以下列尚未全覆盖：${incomplete.join('、')}。仍要导出已有译文吗？（未译条目会保留原稿）`,
+    )
+    if (!ok) return
+  }
   try {
     const translationsByTag: Record<string, Record<string, string>> = {}
-    for (const tag of translatedTags.value) {
+    for (const tag of exportableTags.value) {
       const map: Record<string, string> = {}
       for (const row of rows.value) {
         const t = row[tag]
@@ -487,6 +613,11 @@ async function runExport() {
     color: #bbf7d0;
   }
 
+  &.is-partial:not(.is-active) {
+    border-color: rgba(251, 191, 36, 0.5);
+    color: #fde68a;
+  }
+
   &__x {
     display: grid;
     height: 1.15rem;
@@ -545,6 +676,13 @@ async function runExport() {
   font-size: 0.8rem;
   line-height: 1.45;
   color: #86efac;
+}
+
+.xx-warn {
+  margin-top: 0.65rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #fde68a;
 }
 
 .xx-field {

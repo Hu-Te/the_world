@@ -1,11 +1,12 @@
 <template>
-  <div ref="hostRef" class="home-hero-canvas">
+  <div ref="hostRef" class="home-hero-canvas" :data-ready="ready ? '1' : undefined">
     <canvas
       ref="canvasRef"
       class="home-hero-canvas__el"
+      :class="{ 'is-ready': ready }"
       aria-label="环视分舱，点入工位" />
     <div class="home-hero-canvas__veil" aria-hidden="true" />
-    <p class="home-hero-canvas__hint" aria-hidden="true">
+    <p v-show="ready" class="home-hero-canvas__hint" aria-hidden="true">
       {{ hintText }}
     </p>
   </div>
@@ -15,7 +16,11 @@
 import type { HomeHeroManager } from '~/utils/web3d/HomeHeroManager'
 import type { ToolItem } from '~/utils/tools/catalog'
 
+/** 组件 chunk 一执行就开拉 Three，不等 onMounted */
+const homeHeroManagerPromise = import('~/utils/web3d/HomeHeroManager')
+
 const emit = defineEmits<{
+  ready: []
   'drill-open': [id: string]
   'drill-close': []
   'select-tool': [tool: ToolItem]
@@ -24,24 +29,28 @@ const emit = defineEmits<{
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const hostRef = ref<HTMLElement | null>(null)
 const drilling = ref(false)
+const ready = ref(false)
 
 const hintText = computed(() =>
-  drilling.value ? '环视工具 · 点选进入 · Esc 返回' : '环视分舱 · 点击进入',
+  drilling.value ? '环视工具 · 点选进入 · Esc 返回' : '环视分舱 · 右上角登录进入系统',
 )
 
 let manager: HomeHeroManager | null = null
 let resizeObserver: ResizeObserver | null = null
 let intersectionObserver: IntersectionObserver | null = null
+let cancelled = false
 
 onMounted(() => {
+  cancelled = false
   void nextTick(async () => {
     const canvas = canvasRef.value
     const host = hostRef.value
     if (!canvas || !host) return
 
     try {
-      if (document.fonts?.ready) await document.fonts.ready
-      const { HomeHeroManager } = await import('~/utils/web3d/HomeHeroManager')
+      const { HomeHeroManager } = await homeHeroManagerPromise
+      if (cancelled) return
+
       manager = new HomeHeroManager({
         canvas,
         onDrillOpen: (id) => {
@@ -60,7 +69,14 @@ onMounted(() => {
         manager?.resize(Math.max(rect.width, 1), Math.max(rect.height, 1))
       }
       applySize()
-      requestAnimationFrame(applySize)
+
+      // 等真正画出一帧再露 canvas，避免盖住 CSS 壳层后空黑屏
+      requestAnimationFrame(() => {
+        if (cancelled) return
+        applySize()
+        ready.value = true
+        emit('ready')
+      })
 
       resizeObserver = new ResizeObserver(applySize)
       resizeObserver.observe(host)
@@ -77,6 +93,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  cancelled = true
   resizeObserver?.disconnect()
   intersectionObserver?.disconnect()
   manager?.dispose()
@@ -101,6 +118,12 @@ defineExpose({
 
   &__el {
     @apply absolute inset-0 block h-full w-full;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+
+    &.is-ready {
+      opacity: 1;
+    }
   }
 
   &__veil {

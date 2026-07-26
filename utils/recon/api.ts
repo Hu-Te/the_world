@@ -1,4 +1,4 @@
-import { apiFetch, apiUpload } from '~/utils/api/http'
+import { apiFetch, apiUpload, toolAuthHeaders, toolRequestUrl } from '~/utils/api/http'
 import { getReconAccessToken } from './session'
 import type { AiSuggestion, ReconId, ReconTaskDetail } from './types'
 
@@ -40,15 +40,13 @@ export function deleteReconTaskBeacon(taskId: ReconId) {
     return
   }
   if (!token) return
-  const config = useRuntimeConfig()
-  const origin = ((config.public.apiOrigin as string) || '').replace(/\/$/, '')
-  const apiToken = (config.public.apiToken as string) || ''
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    'X-Recon-Token': token,
+  let headers: Record<string, string>
+  try {
+    headers = { Accept: 'application/json', 'X-Recon-Token': token, ...toolAuthHeaders() }
+  } catch {
+    return
   }
-  if (apiToken) headers['X-API-Token'] = apiToken
-  void fetch(`${origin}/api/recon/tasks/${taskId}`, {
+  void fetch(toolRequestUrl(`/api/recon/tasks/${taskId}`), {
     method: 'DELETE',
     headers,
     keepalive: true,

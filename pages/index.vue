@@ -1,15 +1,28 @@
 <template>
   <div class="page-home">
+    <!-- 不用 ClientOnly：登录必须进 SSR/首屏，否则右上角会一直空 -->
+    <IamCornerPortal @open="onIamOpen" />
+    <ClientOnly>
+      <IamLoginModal v-model:open="openLogin" @success="onLoginSuccess" @close="openLogin = false" />
+      <IamSystemSelectModal v-model:open="openSystems" @close="openSystems = false" />
+    </ClientOnly>
+
     <section class="page-home__hero">
+      <!-- 壳层常驻：Three 下载期间不能被空 canvas 盖掉 -->
+      <div
+        class="page-home__fallback"
+        :class="{ 'is-gone': heroReady }"
+        aria-hidden="true">
+        <div class="page-home__fallback-orbit" />
+        <div class="page-home__fallback-core" />
+      </div>
       <ClientOnly>
         <HomeHeroCanvas
           ref="canvasRef"
+          @ready="heroReady = true"
           @drill-open="onDrillOpen"
           @drill-close="onDrillClose"
           @select-tool="onSelectTool" />
-        <template #fallback>
-          <div class="page-home__fallback" aria-hidden="true" />
-        </template>
       </ClientOnly>
 
       <header v-show="!drillCat" class="page-home__brand">
@@ -52,16 +65,31 @@
 </template>
 
 <script setup lang="ts">
+import IamCornerPortal from '~/components/iam/CornerPortal.vue'
 import { getCategory, type ToolCategory, type ToolItem } from '~/utils/tools/catalog'
+
+const IamLoginModal = defineAsyncComponent(() => import('~/components/iam/LoginModal.vue'))
+const IamSystemSelectModal = defineAsyncComponent(
+  () => import('~/components/iam/SystemSelectModal.vue'),
+)
 
 const SITE_DESC = '深空测控：浏览器直达的精密工具测控台。行业分舱选型，校对与核算结果可核。'
 
 const config = useRuntimeConfig()
 const siteName = computed(() => String(config.public.siteName ?? ''))
+const auth = useAuthStore()
 
 const canvasRef = ref<{ closeDrill: () => void } | null>(null)
 const drillCat = ref<ToolCategory | null>(null)
 const tip = ref('')
+const heroReady = ref(false)
+
+// 首页 JS 一跑就预拉 Three，与 hydration 并行
+if (import.meta.client) {
+  void import('~/utils/web3d/HomeHeroManager')
+}
+const openLogin = ref(false)
+const openSystems = ref(false)
 let tipTimer = 0
 
 useSeoMeta({
@@ -105,6 +133,18 @@ const onSelectTool = (tool: ToolItem) => {
   showTip(`${tool.name} · ${tool.badge}`)
 }
 
+/** 右上角「登录」：未登录弹登录窗，已登录弹二级系统选择 */
+function onIamOpen() {
+  auth.hydrate()
+  if (auth.isLoggedIn) openSystems.value = true
+  else openLogin.value = true
+}
+
+function onLoginSuccess() {
+  openSystems.value = true
+}
+
+onMounted(() => auth.hydrate())
 onUnmounted(clearTip)
 </script>
 
@@ -117,7 +157,32 @@ onUnmounted(clearTip)
   }
 
   &__fallback {
-    @apply absolute inset-0 bg-ink-950;
+    @apply absolute inset-0 z-0 bg-ink-950;
+    background:
+      radial-gradient(ellipse 70% 55% at 50% 42%, rgba(14, 40, 58, 0.55) 0%, transparent 70%),
+      radial-gradient(ellipse 100% 80% at 50% 100%, rgba(3, 8, 14, 1) 0%, #03080e 100%);
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+
+    &.is-gone {
+      opacity: 0;
+    }
+  }
+
+  &__fallback-orbit {
+    @apply absolute left-1/2 top-[46%] h-[min(52vw,28rem)] w-[min(52vw,28rem)] -translate-x-1/2 -translate-y-1/2;
+    border-radius: 50%;
+    border: 1px solid rgba(110, 200, 232, 0.14);
+    box-shadow:
+      inset 0 0 60px rgba(110, 200, 232, 0.05),
+      0 0 0 22px rgba(110, 200, 232, 0.03),
+      0 0 90px rgba(110, 200, 232, 0.08);
+  }
+
+  &__fallback-core {
+    @apply absolute left-1/2 top-[46%] h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full;
+    background: radial-gradient(circle, rgba(110, 200, 232, 0.35) 0%, rgba(110, 200, 232, 0.08) 45%, transparent 70%);
+    box-shadow: 0 0 48px rgba(110, 200, 232, 0.22);
   }
 
   &__brand {
@@ -210,6 +275,18 @@ onUnmounted(clearTip)
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes home-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(1.03);
   }
 }
 

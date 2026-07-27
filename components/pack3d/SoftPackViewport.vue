@@ -90,6 +90,8 @@ async function buildMesh(dims: SoftPackDims) {
 
   const formed = (geo.userData.formed || {}) as {
     width?: number
+    bodyWidth?: number
+    sideWidth?: number
     height?: number
     depth?: number
     seal?: number
@@ -120,11 +122,13 @@ async function buildMesh(dims: SoftPackDims) {
     const v = Number.isFinite(n) ? (n as number) : fb
     return Math.round(v * 10) / 10
   }
-  const bodyW = (formed as { bodyWidth?: number }).bodyWidth
-  const sideW = (formed as { sideWidth?: number }).sideWidth
-  const outerW = formed.width ?? (bodyW ?? dims.mainFaceWidth) + dims.sealWidth * 2
+  const bodyW = formed.bodyWidth ?? dims.mainFaceWidth
+  const sideW = formed.sideWidth ?? dims.sideWidth
+  const sealW = formed.seal ?? dims.sealWidth
+  // 外宽永远 = 正栏 + 两封边；勿单独信任 formed.width（旧 upright 曾误写成正栏宽）
+  const outerW = bodyW + sealW * 2
   // 正宽×高×厚（刀模 1:1）· 外宽(=正+2封) · 封边
-  debug.value = `${kind} ${mm(bodyW, dims.mainFaceWidth)}×${mm(formed.height, height)}×${mm(depth, dims.maxHalfDepth ? dims.maxHalfDepth * 2 : 42)} mm · 外宽${mm(outerW, dims.mainFaceWidth + dims.sealWidth * 2)} · 封${mm(formed.seal, dims.sealWidth)}（侧${mm(sideW, dims.sideWidth)}）`
+  debug.value = `${kind} ${mm(bodyW, dims.mainFaceWidth)}×${mm(formed.height, height)}×${mm(depth, dims.maxHalfDepth ? dims.maxHalfDepth * 2 : 42)} mm · 外宽${mm(outerW, dims.mainFaceWidth + dims.sealWidth * 2)} · 封${mm(sealW, dims.sealWidth)}（侧${mm(sideW, dims.sideWidth)}）`
   const uvTag = String((geo.userData as { uvVersion?: string }).uvVersion || '')
   const filmW = Number((geo.userData as { filmW?: number }).filmW || 0)
   const formedW = Number((geo.userData as { totalW?: number }).totalW || 0)

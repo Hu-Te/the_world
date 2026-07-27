@@ -1,76 +1,28 @@
 <template>
   <div class="fp">
-    <header class="fp-bar">
-      <div class="fp-bar__chips">
-        <span class="fp-chip">
-          <span :class="['fp-dot', `fp-dot--${wsStatus}`]" />
-          WS {{ wsStatus }}
-        </span>
-        <span
-          class="fp-chip"
-          :class="session?.connected ? 'fp-chip--ok' : session ? 'fp-chip--warn' : ''">
-          {{
-            session
-              ? `${lifecycleStateZh(session.lifecycleState)} · ${session.connected ? '已连接' : '未连接'}`
-              : '未开会话'
-          }}
-        </span>
-        <span v-if="protocol === 'S7'" class="fp-chip">
-          代理 {{ agentId || '直连' }}
-          <template v-if="agents.length">· 在线 {{ agents.length }}</template>
-        </span>
-        <span class="fp-chip fp-chip--muted">{{ previewDeviceId }}</span>
-        <span class="fp-chip fp-chip--muted">点位 {{ tags.length }}</span>
-      </div>
-      <div class="fp-bar__actions">
-        <button type="button" class="fp-btn fp-btn--sm" :disabled="busy" @click="onOpenSession">
-          启动
-        </button>
-        <button
-          type="button"
-          class="fp-btn fp-btn--ghost fp-btn--sm"
-          :disabled="!session || busy"
-          @click="onCloseSession">
-          停止
-        </button>
-        <button
-          type="button"
-          class="fp-btn fp-btn--accent fp-btn--sm"
-          :disabled="busy || protocol !== 'S7'"
-          @click="onBatchRead">
-          单次读
-        </button>
-        <button
-          type="button"
-          class="fp-btn fp-btn--ghost fp-btn--sm"
-          :disabled="busy"
-          title="导出连接与点位配置为 JSON"
-          @click="onExportConfig">
-          导出
-        </button>
-        <button
-          type="button"
-          class="fp-btn fp-btn--ghost fp-btn--sm"
-          :disabled="busy"
-          title="从 JSON 导入配置"
-          @click="triggerImport">
-          导入
-        </button>
-        <input
-          ref="importInput"
-          class="fp-file"
-          type="file"
-          accept="application/json,.json"
-          @change="onImportFile" />
-        <button
-          type="button"
-          class="fp-btn fp-btn--ghost fp-btn--sm"
-          :class="{ 'fp-btn--on': showSide }"
-          @click="showSide = !showSide">
-          {{ showSide ? '收起配置' : '配置' }}
-        </button>
-      </div>
-    </header>
+    <FieldPulseCabinBar
+      :ws-status="wsStatus"
+      :session="session"
+      :lifecycle-label="session ? lifecycleStateZh(session.lifecycleState) : ''"
+      :protocol="protocol"
+      :agent-id="agentId"
+      :agent-count="agents.length"
+      :preview-device-id="previewDeviceId"
+      :tag-count="tags.length"
+      :busy="busy"
+      :show-side="showSide"
+      @open="onOpenSession"
+      @close="onCloseSession"
+      @batch-read="onBatchRead"
+      @export="onExportConfig"
+      @import="triggerImport"
+      @toggle-side="showSide = !showSide" />
+    <input
+      ref="importInput"
+      class="fp-file"
+      type="file"
+      accept="application/json,.json"
+      @change="onImportFile" />
 
     <p v-if="error" class="fp-banner fp-banner--bad">{{ error }}</p>
     <p v-else-if="tipTone !== 'idle'" class="fp-banner" :class="`fp-banner--${tipTone}`">
@@ -79,94 +31,23 @@
 
     <div class="fp-layout" :class="{ 'fp-layout--full': !showSide }">
       <aside v-show="showSide" class="fp-side">
-        <section class="fp-panel fp-panel--conn">
-          <button
-            type="button"
-            class="fp-panel__row fp-panel__toggle"
-            @click="showConn = !showConn">
-            <h2 class="fp-panel__title">
-              连接
-              <span class="fp-panel__meta">{{ protocol }} · {{ agentId || '直连' }}</span>
-            </h2>
-            <span class="fp-muted">{{ showConn ? '收起' : '展开' }}</span>
-          </button>
-
-          <div v-show="showConn" class="fp-panel__body">
-            <div class="fp-grid fp-grid--conn">
-              <label class="fp-field">
-                <span>协议</span>
-                <select v-model="protocol" @change="onProtocolChange">
-                  <option value="S7">S7</option>
-                  <option value="MODBUS">MODBUS</option>
-                  <option value="CUSTOM_HEX">CUSTOM_HEX</option>
-                </select>
-              </label>
-              <label v-if="protocol !== 'CUSTOM_HEX'" class="fp-field">
-                <span>轮询 ms</span>
-                <input v-model.number="pollMs" type="number" min="50" />
-              </label>
-
-              <label v-if="protocol === 'S7'" class="fp-field fp-field--wide">
-                <span>现场代理</span>
-                <div class="fp-inline">
-                  <select v-model="agentId">
-                    <option value="">直连（仅同网）</option>
-                    <option
-                      v-if="agentId && !agents.some((a) => a.agentId === agentId)"
-                      :value="agentId">
-                      {{ agentId }}（离线）
-                    </option>
-                    <option v-for="a in agents" :key="a.agentId" :value="a.agentId">
-                      {{ a.displayName || a.agentId }}
-                    </option>
-                  </select>
-                  <button
-                    type="button"
-                    class="fp-btn fp-btn--ghost fp-btn--sm"
-                    :disabled="busy"
-                    title="刷新在线代理"
-                    @click="refreshAgents">
-                    刷新
-                  </button>
-                  <button
-                    type="button"
-                    class="fp-btn fp-btn--ghost fp-btn--sm"
-                    title="下载现场工具包"
-                    @click="agentModalOpen = true">
-                    下载
-                  </button>
-                </div>
-              </label>
-
-              <label v-if="protocol !== 'CUSTOM_HEX'" class="fp-field fp-field--wide">
-                <span>PLC IP</span>
-                <input v-model.trim="ip" placeholder="192.168.0.1" />
-              </label>
-
-              <label class="fp-field">
-                <span>{{ protocol === 'CUSTOM_HEX' ? '监听端口' : '端口' }}</span>
-                <input
-                  v-model.number="port"
-                  type="number"
-                  min="0"
-                  :placeholder="String(defaultPort)" />
-              </label>
-              <label v-if="protocol === 'S7'" class="fp-field">
-                <span>Rack / Slot</span>
-                <div class="fp-inline fp-inline--pair">
-                  <input v-model.number="rack" type="number" min="0" title="Rack" />
-                  <span class="fp-sep">/</span>
-                  <input v-model.number="slot" type="number" min="0" title="Slot" />
-                </div>
-              </label>
-              <label v-if="protocol === 'MODBUS'" class="fp-field">
-                <span>UnitId</span>
-                <input v-model.number="unitId" type="number" min="1" />
-              </label>
-            </div>
-            <p class="fp-hint fp-hint--device">{{ previewDeviceId }}</p>
-          </div>
-        </section>
+        <FieldPulseCabinConn
+          v-model:open="showConn"
+          v-model:protocol="protocol"
+          v-model:poll-ms="pollMs"
+          v-model:agent-id="agentId"
+          v-model:ip="ip"
+          v-model:port="port"
+          v-model:rack="rack"
+          v-model:slot="slot"
+          v-model:unit-id="unitId"
+          :agents="agents"
+          :busy="busy"
+          :default-port="defaultPort"
+          :preview-device-id="previewDeviceId"
+          @protocol-change="onProtocolChange"
+          @refresh-agents="refreshAgents"
+          @download-agent="agentModalOpen = true" />
 
         <section class="fp-panel fp-panel--tags">
           <div class="fp-panel__row">
@@ -502,6 +383,7 @@
 
 <script setup lang="ts">
 import FieldPulseAgentDownloadModal from '~/components/fieldpulse/FieldPulseAgentDownloadModal.vue'
+import FieldPulseCabinConn from '~/components/fieldpulse/FieldPulseCabinConn.vue'
 import {
   closeSession,
   listAgents,
@@ -509,6 +391,7 @@ import {
   openSession,
   s7BatchRead,
   s7DeviceId,
+  wsAuthProtocols,
   wsUrl,
   type FieldPulseAgent,
   type FieldPulseSession,
@@ -1156,9 +1039,15 @@ async function cleanupSession(opts?: { keepalive?: boolean }) {
 
 function ensureWs() {
   if (client) return
-  client = new RobustWebSocket(wsUrl(), onWsMessage, (s) => {
-    wsStatus.value = s
-  })
+  client = new RobustWebSocket(
+    wsUrl('tools'),
+    onWsMessage,
+    (s) => {
+      wsStatus.value = s
+    },
+    null,
+    wsAuthProtocols(),
+  )
   client.connect()
 }
 
@@ -1397,7 +1286,13 @@ async function refreshAgents() {
       // 保留已保存的 agentId，即使暂时不在线，便于下次导入后仍选中
     }
   } catch (e) {
-    error.value = lifecycleReasonZh(e instanceof Error ? e.message : String(e))
+    const msg = e instanceof Error ? e.message : String(e)
+    // 在线列表需登录；匿名仍可手动填写 agentId 连接
+    if (/401|403|未登录|未解锁|UNAUTHORIZED|FORBIDDEN/i.test(msg)) {
+      agents.value = []
+      return
+    }
+    error.value = lifecycleReasonZh(msg)
   }
 }
 

@@ -1,19 +1,22 @@
 <template>
   <PlcCenterShell title="报警中心">
     <template #actions>
-      <button type="button" class="plc-btn" @click="toggleRuleForm">
+      <button type="button" class="plc-btn" :disabled="actionBusy" @click="toggleRuleForm">
         {{ showRule ? '收起' : '新建规则' }}
       </button>
-      <button type="button" class="plc-btn plc-btn--ghost" @click="onExport">导出 CSV</button>
+      <button type="button" class="plc-btn plc-btn--ghost" :disabled="actionBusy" @click="onExport">
+        导出 CSV
+      </button>
       <button
         type="button"
         class="plc-btn plc-btn--ghost"
-        :disabled="loading"
+        :disabled="loading || actionBusy"
         @click.prevent.stop="reloadList">
         {{ loading ? '刷新中…' : '刷新' }}
       </button>
     </template>
 
+    <div class="plc-alarms" @pointerdown="markInteract">
     <p v-if="error" class="plc-err">{{ error }}</p>
 
     <form v-if="showRule" class="plc-form" @submit.prevent="saveRule">
@@ -121,7 +124,13 @@
               {{ deviceName(r.deviceId) }} · {{ r.tagKey }} · {{ formatRuleCond(r) }}
             </p>
           </div>
-          <button type="button" class="link danger" @click="removeRule(r.id)">删除</button>
+          <button
+            type="button"
+            class="link danger"
+            :disabled="actionBusy"
+            @click="removeRule(r.id)">
+            删除
+          </button>
         </li>
         <li v-if="!rules.length" class="muted">暂无规则</li>
         <li v-else-if="!filteredRules.length" class="muted">无匹配规则</li>
@@ -133,10 +142,26 @@
         <h3 class="plc-h">事件</h3>
         <span class="plc-count">{{ events.length }}</span>
         <div class="plc-panel__actions">
-          <button type="button" class="link" :disabled="!hasAcked" @click="clearAcked">
+          <button
+            type="button"
+            class="link"
+            :disabled="actionBusy || !hasOrphans"
+            title="清除规则已删除但仍残留的事件"
+            @click="clearOrphans">
+            清除孤儿
+          </button>
+          <button
+            type="button"
+            class="link"
+            :disabled="actionBusy || !hasAcked"
+            @click="clearAcked">
             清除已确认
           </button>
-          <button type="button" class="link danger" :disabled="!events.length" @click="clearAll">
+          <button
+            type="button"
+            class="link danger"
+            :disabled="actionBusy || !events.length"
+            @click="clearAll">
             清空全部
           </button>
         </div>
@@ -154,9 +179,15 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="e in events" :key="e.id" :class="{ 'is-open': !e.acked }">
+            <tr
+              v-for="e in events"
+              :key="e.id"
+              :class="{ 'is-open': !e.acked, 'is-orphan': e.ruleExists === false }">
               <td>
-                <p class="evt-msg">{{ cleanMessage(e.message) }}</p>
+                <p class="evt-msg">
+                  {{ cleanMessage(e.message) }}
+                  <span v-if="e.ruleExists === false" class="badge is-orphan" title="规则已删除">孤儿</span>
+                </p>
                 <p class="evt-sub mono">{{ deviceName(e.deviceId) }} · {{ e.tagKey }}</p>
               </td>
               <td class="mono val">{{ formatEventValue(e) }}</td>
@@ -173,9 +204,22 @@
                 </span>
               </td>
               <td class="evt-actions">
-                <button v-if="!e.acked" type="button" class="link" @click="ack(e.id)">确认</button>
+                <button
+                  v-if="!e.acked"
+                  type="button"
+                  class="link"
+                  :disabled="actionBusy"
+                  @click="ack(e.id)">
+                  确认
+                </button>
                 <span v-else class="evt-sub">{{ formatTime(e.ackedAt) }}</span>
-                <button type="button" class="link danger" @click="removeEvent(e.id)">清除</button>
+                <button
+                  type="button"
+                  class="link danger"
+                  :disabled="actionBusy"
+                  @click="removeEvent(e.id)">
+                  清除
+                </button>
               </td>
             </tr>
             <tr v-if="!events.length">
@@ -185,6 +229,7 @@
         </table>
       </div>
     </div>
+    </div>
   </PlcCenterShell>
 </template>
 
@@ -193,6 +238,7 @@ import PlcCenterShell from '~/components/console/fieldpulse/PlcCenterShell.vue'
 import {
   ackAlarm,
   clearAlarms,
+  clearOrphanAlarms,
   createAlarmRule,
   deleteAlarm,
   deleteAlarmRule,
@@ -226,7 +272,49 @@ const rules = ref<AlarmRule[]>([])
 const events = ref<AlarmEvent[]>([])
 const error = ref('')
 const loading = ref(false)
+/** 确认/删除等写操作进行中，禁止轮询冲掉 DOM */
+const actionBusy = ref(false)
+/** 指针交互宽限：避免 mousedown 后整表重绘导致 click 丢失 */
+let interactUntil = 0
 const showRule = ref(false)
+
+function markInteract() {
+  interactUntil = Date.now() + 2500
+}
+
+function normalizeId(v: string | number | null | undefined): string {
+  return v == null ? '' : String(v)
+}
+
+function normalizeEvents(list: AlarmEvent[]): AlarmEvent[] {
+  return list.map((e) => ({
+    ...e,
+    id: normalizeId(e.id),
+    deviceId: normalizeId(e.deviceId),
+    ruleId: normalizeId(e.ruleId),
+  }))
+}
+
+function normalizeRules(list: AlarmRule[]): AlarmRule[] {
+  return list.map((r) => ({
+    ...r,
+    id: normalizeId(r.id),
+    deviceId: normalizeId(r.deviceId),
+  }))
+}
+
+function eventsFingerprint(list: AlarmEvent[]) {
+  return list
+    .map(
+      (e) =>
+        `${e.id}|${e.acked ? 1 : 0}|${e.occurrenceCount}|${e.lastOccurredAt}|${e.ackedAt || ''}|${e.ruleExists === false ? 0 : 1}|${e.message}`,
+    )
+    .join(';')
+}
+
+function rulesFingerprint(list: AlarmRule[]) {
+  return list.map((r) => `${r.id}|${r.ruleName}|${r.enabled ? 1 : 0}|${r.cycleMs || 0}`).join(';')
+}
 const ruleForm = reactive({
   deviceId: '' as string,
   tagKey: '',
@@ -239,6 +327,7 @@ const ruleForm = reactive({
 })
 
 const hasAcked = computed(() => events.value.some((e) => e.acked))
+const hasOrphans = computed(() => events.value.some((e) => e.ruleExists === false))
 
 const ruleFilter = reactive({
   q: '',
@@ -403,11 +492,14 @@ async function reloadList() {
   error.value = ''
   loading.value = true
   try {
-    ;[devices.value, rules.value, events.value] = await Promise.all([
+    const [devs, nextRules, nextEvents] = await Promise.all([
       listDevices(),
       listAlarmRules(),
       listAlarms(undefined, 200),
     ])
+    devices.value = devs.map((d) => ({ ...d, id: normalizeId(d.id) }))
+    rules.value = normalizeRules(nextRules)
+    events.value = normalizeEvents(nextEvents)
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -456,43 +548,48 @@ async function saveRule() {
   }
 }
 
-async function removeRule(id: string) {
-  await deleteAlarmRule(id)
-  await reloadList()
-}
-
-async function ack(id: string) {
-  await ackAlarm(id)
-  await reloadList()
-}
-
-async function removeEvent(id: string) {
+async function withAction(fn: () => Promise<void>) {
+  if (actionBusy.value) return
+  actionBusy.value = true
+  markInteract()
+  error.value = ''
   try {
-    await deleteAlarm(id)
+    await fn()
     await reloadList()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    actionBusy.value = false
+    markInteract()
   }
+}
+
+async function removeRule(id: string) {
+  if (!confirm('删除该规则？关联事件将一并清除。')) return
+  await withAction(() => deleteAlarmRule(normalizeId(id)))
+}
+
+async function ack(id: string) {
+  await withAction(() => ackAlarm(normalizeId(id)))
+}
+
+async function removeEvent(id: string) {
+  await withAction(() => deleteAlarm(normalizeId(id)))
+}
+
+async function clearOrphans() {
+  if (!confirm('清除所有「规则已删除」的孤儿事件？')) return
+  await withAction(() => clearOrphanAlarms().then(() => undefined))
 }
 
 async function clearAcked() {
   if (!confirm('清除所有已确认事件？')) return
-  try {
-    await clearAlarms(true)
-    await reloadList()
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
-  }
+  await withAction(() => clearAlarms(true).then(() => undefined))
 }
 
 async function clearAll() {
   if (!confirm('清空全部事件（含未确认）？此操作不可恢复。')) return
-  try {
-    await clearAlarms()
-    await reloadList()
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
-  }
+  await withAction(() => clearAlarms().then(() => undefined))
 }
 
 async function onExport() {
@@ -503,10 +600,52 @@ async function onExport() {
   }
 }
 
-onMounted(reloadList)
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+async function silentReload() {
+  if (loading.value || actionBusy.value || document.hidden) return
+  if (Date.now() < interactUntil) return
+  try {
+    const [devs, nextRules, nextEvents] = await Promise.all([
+      listDevices(),
+      listAlarmRules(),
+      listAlarms(undefined, 200),
+    ])
+    // 二次检查：请求期间用户可能已按下按钮
+    if (loading.value || actionBusy.value || Date.now() < interactUntil) return
+    const normRules = normalizeRules(nextRules)
+    const normEvents = normalizeEvents(nextEvents)
+    devices.value = devs.map((d) => ({ ...d, id: normalizeId(d.id) }))
+    if (rulesFingerprint(normRules) !== rulesFingerprint(rules.value)) {
+      rules.value = normRules
+    }
+    if (eventsFingerprint(normEvents) !== eventsFingerprint(events.value)) {
+      events.value = normEvents
+    }
+  } catch {
+    // 静默轮询失败不打断操作
+  }
+}
+
+onMounted(() => {
+  reloadList()
+  // 5s 足够；过密整表替换会吞掉 click（点不动）
+  pollTimer = setInterval(silentReload, 5000)
+})
+
+onBeforeUnmount(() => {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+})
 </script>
 
 <style scoped lang="scss">
+.plc-alarms {
+  min-height: 0;
+}
+
 .plc-form {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -747,6 +886,17 @@ onMounted(reloadList)
     background: rgba(52, 211, 153, 0.1);
     border: 1px solid rgba(52, 211, 153, 0.28);
   }
+
+  &.is-orphan {
+    margin-left: 0.35rem;
+    color: #fcd34d;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+  }
+}
+
+tbody tr.is-orphan td {
+  opacity: 0.88;
 }
 
 .mono {
@@ -764,6 +914,14 @@ onMounted(reloadList)
   color: #67e8f9;
   cursor: pointer;
   font-size: 0.78rem;
+  position: relative;
+  z-index: 2;
+  padding: 0.15rem 0.25rem;
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
 
   &.danger {
     color: #fca5a5;

@@ -11,8 +11,9 @@ const TOKEN_KEY = 'iam.accessToken'
 const PROFILE_KEY = 'iam.profile'
 
 export type UserProfile = {
-  userId: number
-  tenantId: number
+  /** 雪花 Long：后端 Jackson 以字符串下发，禁止 Number() 以免丢精度 */
+  userId: string
+  tenantId: string
   username: string
   displayName: string
   planCode: string
@@ -20,6 +21,14 @@ export type UserProfile = {
   permissions: string[]
   unlockedModules: string[]
   validUntil?: string
+}
+
+function normalizeProfile(profile: UserProfile): UserProfile {
+  return {
+    ...profile,
+    userId: String(profile.userId ?? ''),
+    tenantId: String(profile.tenantId ?? ''),
+  }
 }
 
 export type LoginResult = {
@@ -46,7 +55,7 @@ function isAuthFailure(res: Response, json: { code?: number; message?: string } 
   if (json?.code === 401) return true
   const msg = json?.message || ''
   // 勿匹配笼统「已过期」（额度过期是 403 业务错误，不应清会话踢首页）
-  return /令牌无效|令牌已失效|令牌无效或已过期|未登录或令牌无效|会话不存在或已注销|^未登录$|请先登录/.test(
+  return /令牌无效|令牌已失效|令牌无效或已过期|未登录或令牌无效|会话不存在或已注销|账号已在其他设备登录|^未登录$|请先登录/.test(
     msg,
   )
 }
@@ -90,6 +99,14 @@ async function sysFetch<T>(
   if (token) headers.set('Authorization', `Bearer ${token}`)
   const url = `${apiBase()}${path.startsWith('/') ? path : `/${path}`}`
   const res = await fetch(url, { ...init, headers })
+  const renewed = res.headers.get('X-Access-Token') || res.headers.get('x-access-token')
+  if (renewed && import.meta.client) {
+    try {
+      useAuthStore().applyRenewedToken(renewed)
+    } catch {
+      /* Pinia 未就绪时忽略 */
+    }
+  }
   const json = (await res.json().catch(() => null)) as {
     code: number
     message: string
@@ -132,7 +149,7 @@ export const useAuthStore = defineStore('auth', {
       const raw = localStorage.getItem(PROFILE_KEY)
       if (raw) {
         try {
-          this.profile = JSON.parse(raw) as UserProfile
+          this.profile = normalizeProfile(JSON.parse(raw) as UserProfile)
         } catch {
           this.profile = null
         }
@@ -143,8 +160,9 @@ export const useAuthStore = defineStore('auth', {
       if (!import.meta.client) return
       if (this.accessToken) localStorage.setItem(TOKEN_KEY, this.accessToken)
       else localStorage.removeItem(TOKEN_KEY)
-      if (this.profile) localStorage.setItem(PROFILE_KEY, JSON.stringify(this.profile))
-      else localStorage.removeItem(PROFILE_KEY)
+      if (this.profile) {
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(normalizeProfile(this.profile)))
+      } else localStorage.removeItem(PROFILE_KEY)
     },
     clearLocalSession() {
       this.accessToken = ''
@@ -159,21 +177,29 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     async login(username: string, password: string) {
+      const { encryptPasswordForTransport } = await import('~/utils/iam/passwordCrypto')
+      const cipher = await encryptPasswordForTransport(password)
       const data = await sysFetch<LoginResult>('/api/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password: cipher }),
       })
       this.accessToken = data.accessToken
-      this.profile = data.profile
+      this.profile = normalizeProfile(data.profile)
       this.persist()
       return data
+    },
+    /** 滑动续签：后端经 X-Access-Token 下发新 JWT 时替换本地会话。 */
+    applyRenewedToken(token: string | null | undefined) {
+      if (!token || !token.trim()) return
+      this.accessToken = token.trim()
+      this.persist()
     },
     async refreshMe() {
       if (!this.accessToken) return null
       const profile = await sysFetch<UserProfile>('/api/auth/me', { method: 'GET' }, this.accessToken)
-      this.profile = profile
+      this.profile = normalizeProfile(profile)
       this.persist()
-      return profile
+      return this.profile
     },
     async logout() {
       try {
@@ -189,6 +215,22 @@ export const useAuthStore = defineStore('auth', {
         /* 忽略登出网络错误 */
       }
       this.clearLocalSession()
+    },
+    /** 自助改密；成功后服务端吊销会话，调用方应清本地并回登录页。 */
+    async changePassword(oldPassword: string, newPassword: string) {
+      if (!this.accessToken) throw new Error('未登录')
+      const { encryptPasswordForTransport } = await import('~/utils/iam/passwordCrypto')
+      const oldCipher = await encryptPasswordForTransport(oldPassword)
+      const newCipher = await encryptPasswordForTransport(newPassword)
+      await sysFetch<null>(
+        '/api/auth/password',
+        {
+          method: 'PUT',
+          body: JSON.stringify({ oldPassword: oldCipher, newPassword: newCipher }),
+        },
+        this.accessToken,
+        { skipExpireRedirect: true },
+      )
     },
     hasModule(moduleCode: string) {
       if (!moduleCode) return false

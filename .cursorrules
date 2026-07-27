@@ -20,6 +20,15 @@
 ## 目录约定
 - `components/ui` — 原子 UI
 - `components/web3d` — 画布外壳（无引擎实例进响应式）
+- `components/<domain>/` — 域 UI；工具舱与管控台分目录，禁止神组件无限膨胀
 - `utils/web3d` — HomeHeroManager 等纯 TS
+- `utils/fieldpulse` vs `utils/console` — 双轨 API，勿混用
 - `stores` — 扁平 Pinia（按需）
 - `deploy/` — Nginx / 部署文档（勿随意改服务器约定）
+- 详见 `docs/FRONTEND_ARCHITECTURE.md`
+
+## 简洁性
+1. 单 SFC 目标 < 400 行；超标拆 Bar / Panel / composable
+2. Page 只编排；业务逻辑进 composable / utils
+3. 禁止第二套 HTTP 客户端；扩展只加 header/basePath
+4. 空目录（auth/types/modules）禁止占位，有类型放 `utils/<domain>/`

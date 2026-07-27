@@ -35,10 +35,11 @@
           class="scada-node__input mono"
           :value="inputDraft"
           :placeholder="displayText"
+          :readonly="!interactive"
           @input="onInputDraft"
           @change="commitSetpoint"
           @blur="commitSetpoint"
-          @focus="emit('select', nodeData.id)" />
+          @focus="interactive && emit('select', { id: nodeData.id, additive: false })" />
         <span v-if="nodeData.unit" class="scada-node__unit">{{ nodeData.unit }}</span>
       </div>
       <span class="scada-node__pv mono">PV {{ displayText }}</span>
@@ -107,7 +108,13 @@
 
     <!-- 管道 -->
     <template v-else-if="nodeData.type === 'pipe'">
-      <span class="scada-node__pipe" :class="{ flow: lampOn }" />
+      <span
+        class="scada-node__pipe"
+        :class="{
+          flow: lampOn,
+          reverse: nodeData.pipeFlowDir === 'reverse',
+          'is-square': nodeData.pipeCorner === 'square',
+        }" />
     </template>
 
     <!-- 面板 -->
@@ -115,14 +122,23 @@
       <span class="scada-node__panel-title">{{ nodeData.text || '面板' }}</span>
     </template>
 
-    <span v-if="selected" class="scada-node__badge mono">{{ bindHint }}</span>
+    <span v-if="selected && interactive" class="scada-node__badge mono">{{ bindHint }}</span>
     <button
-      v-if="selected"
+      v-if="selected && interactive"
       type="button"
       class="scada-node__rot"
       title="拖拽旋转 · Shift 吸附 15°"
       aria-label="旋转"
       @mousedown.stop.prevent="onRotateDown" />
+    <button
+      v-for="corner in resizeCorners"
+      v-show="selected && interactive"
+      :key="corner"
+      type="button"
+      class="scada-node__resize"
+      :class="`is-${corner}`"
+      :aria-label="`缩放 ${corner}`"
+      @mousedown.stop.prevent="onResizeDown($event, corner)" />
   </div>
 </template>
 
@@ -131,17 +147,25 @@ import { storeToRefs } from 'pinia'
 import { useLiveDataStore } from '~/stores/liveData'
 import type { ScadaNodeData } from '~/utils/console/scadaTypes'
 
-const props = defineProps<{
-  nodeData: ScadaNodeData
-  selected?: boolean
-  canvasW: number
-  canvasH: number
-  /** 画布视口缩放，拖拽位移需除以该值 */
-  viewScale?: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    nodeData: ScadaNodeData
+    selected?: boolean
+    canvasW: number
+    canvasH: number
+    /** 画布视口缩放，拖拽位移需除以该值 */
+    viewScale?: number
+    /** false = 运行态只读（不可拖拽/缩放/旋转/改设定） */
+    interactive?: boolean
+  }>(),
+  { interactive: true },
+)
+
+type ResizeCorner = 'nw' | 'ne' | 'sw' | 'se'
+const resizeCorners: ResizeCorner[] = ['nw', 'ne', 'sw', 'se']
 
 const emit = defineEmits<{
-  select: [id: string]
+  select: [payload: { id: string; additive: boolean }]
   move: [payload: { id: string; x: number; y: number }]
   patch: [payload: Partial<ScadaNodeData> & { id: string }]
 }>()
@@ -222,9 +246,11 @@ const rootStyle = computed(() => ({
   height: `${props.nodeData.h}px`,
   transform: rotationDeg.value ? `rotate(${rotationDeg.value}deg)` : undefined,
   fontSize: `${props.nodeData.style?.fontSize ?? 13}px`,
+  fontFamily: props.nodeData.style?.fontFamily || undefined,
   background: props.nodeData.style?.background || undefined,
   borderColor: props.nodeData.style?.borderColor || undefined,
   color: props.nodeData.style?.color || undefined,
+  cursor: props.interactive ? undefined : 'default',
 }))
 
 const inputDraft = ref(props.nodeData.setpoint || '')
@@ -248,7 +274,7 @@ function commitSetpoint() {
 function onButtonClick() {
   // 刚拖过则忽略 click，避免拖完误触「启动」
   if (movedDuringDrag) return
-  emit('select', props.nodeData.id)
+  emit('select', { id: props.nodeData.id, additive: false })
 }
 
 /** 曲线缓冲：组件私有，不进 Pinia */
@@ -323,15 +349,21 @@ const rootEl = ref<HTMLElement | null>(null)
 
 let dragging = false
 let rotating = false
+let resizing = false
+let resizeCorner: ResizeCorner = 'se'
 let movedDuringDrag = false
 let startX = 0
 let startY = 0
 let origX = 0
 let origY = 0
+let origW = 0
+let origH = 0
 
-function clamp(x: number, y: number) {
-  const maxX = Math.max(0, props.canvasW - props.nodeData.w)
-  const maxY = Math.max(0, props.canvasH - props.nodeData.h)
+const MIN_SIZE = 12
+
+function clamp(x: number, y: number, w = props.nodeData.w, h = props.nodeData.h) {
+  const maxX = Math.max(0, props.canvasW - w)
+  const maxY = Math.max(0, props.canvasH - h)
   return {
     x: Math.min(maxX, Math.max(0, Math.round(x))),
     y: Math.min(maxY, Math.max(0, Math.round(y))),
@@ -356,11 +388,15 @@ function angleFromCenter(e: MouseEvent) {
 
 function onPointerDown(e: MouseEvent) {
   if (e.button !== 0) return
-  if (rotating) return
+  if (!props.interactive) {
+    emit('select', { id: props.nodeData.id, additive: false })
+    return
+  }
+  if (rotating || resizing) return
   // 输入框内要打字，不启动拖拽
   const t = e.target as HTMLElement | null
-  if (t?.closest?.('input, textarea, select')) return
-  emit('select', props.nodeData.id)
+  if (t?.closest?.('input, textarea, select, .scada-node__resize, .scada-node__rot')) return
+  emit('select', { id: props.nodeData.id, additive: e.shiftKey })
   dragging = true
   movedDuringDrag = false
   startX = e.clientX
@@ -392,8 +428,8 @@ function onPointerUp() {
 }
 
 function onRotateDown(e: MouseEvent) {
-  if (e.button !== 0) return
-  emit('select', props.nodeData.id)
+  if (e.button !== 0 || !props.interactive) return
+  emit('select', { id: props.nodeData.id, additive: false })
   rotating = true
   dragging = false
   const next = e.shiftKey ? Math.round(angleFromCenter(e) / 15) * 15 : angleFromCenter(e)
@@ -415,11 +451,66 @@ function onRotateUp() {
   window.removeEventListener('mouseup', onRotateUp)
 }
 
+function onResizeDown(e: MouseEvent, corner: ResizeCorner) {
+  if (e.button !== 0 || !props.interactive) return
+  emit('select', { id: props.nodeData.id, additive: false })
+  resizing = true
+  dragging = false
+  resizeCorner = corner
+  startX = e.clientX
+  startY = e.clientY
+  origX = props.nodeData.x
+  origY = props.nodeData.y
+  origW = props.nodeData.w
+  origH = props.nodeData.h
+  window.addEventListener('mousemove', onResizeMove)
+  window.addEventListener('mouseup', onResizeUp)
+}
+
+function onResizeMove(e: MouseEvent) {
+  if (!resizing) return
+  const s = props.viewScale && props.viewScale > 0 ? props.viewScale : 1
+  const dx = (e.clientX - startX) / s
+  const dy = (e.clientY - startY) / s
+  let x = origX
+  let y = origY
+  let w = origW
+  let h = origH
+  if (resizeCorner.includes('e')) w = origW + dx
+  if (resizeCorner.includes('w')) {
+    w = origW - dx
+    x = origX + dx
+  }
+  if (resizeCorner.includes('s')) h = origH + dy
+  if (resizeCorner.includes('n')) {
+    h = origH - dy
+    y = origY + dy
+  }
+  w = Math.max(MIN_SIZE, Math.round(w))
+  h = Math.max(MIN_SIZE, Math.round(h))
+  // 北/西边缩到最小时钉住对边
+  if (resizeCorner.includes('w')) x = origX + origW - w
+  if (resizeCorner.includes('n')) y = origY + origH - h
+  const pos = clamp(x, y, w, h)
+  // 若贴边导致位置被夹，同步修正宽高以免越界
+  w = Math.min(w, props.canvasW - pos.x)
+  h = Math.min(h, props.canvasH - pos.y)
+  emit('patch', { id: props.nodeData.id, x: pos.x, y: pos.y, w, h })
+}
+
+function onResizeUp() {
+  resizing = false
+  window.removeEventListener('mousemove', onResizeMove)
+  window.removeEventListener('mouseup', onResizeUp)
+}
+
 onBeforeUnmount(() => {
   window.removeEventListener('mousemove', onPointerMove)
   window.removeEventListener('mouseup', onPointerUp)
   window.removeEventListener('mousemove', onRotateMove)
   window.removeEventListener('mouseup', onRotateUp)
+  window.removeEventListener('mousemove', onResizeMove)
+  window.removeEventListener('mouseup', onResizeUp)
 })
 </script>
 
@@ -509,13 +600,14 @@ onBeforeUnmount(() => {
   }
 
   &__text {
+    font-size: 1em;
     font-weight: 560;
     letter-spacing: 0.04em;
-    color: #cbd5e1;
+    color: inherit;
   }
 
   &__caption {
-    font-size: 0.68rem;
+    font-size: 0.78em;
     color: #64748b;
     max-width: 100%;
     overflow: hidden;
@@ -528,9 +620,10 @@ onBeforeUnmount(() => {
     font-weight: 650;
     letter-spacing: 0.02em;
     line-height: 1.15;
+    font-size: 1.15em;
 
     &.sm {
-      font-size: 0.78rem;
+      font-size: 1em;
     }
 
     em {
@@ -577,8 +670,8 @@ onBeforeUnmount(() => {
     border-radius: 0.4rem;
     border: 1px solid rgba(110, 200, 232, 0.45);
     background: linear-gradient(180deg, #1e3a4a, #0f1f2a);
-    color: #e2e8f0;
-    font-size: 0.82rem;
+    color: inherit;
+    font-size: 1em;
     font-weight: 600;
     letter-spacing: 0.08em;
     cursor: grab;
@@ -672,15 +765,23 @@ onBeforeUnmount(() => {
     border: 1px solid rgba(148, 163, 184, 0.4);
     box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.35);
 
+    &.is-square {
+      border-radius: 0;
+    }
+
     &.flow {
       background: linear-gradient(90deg, #0e7490, #22d3ee, #0e7490);
       background-size: 200% 100%;
       animation: flow 1s linear infinite;
     }
+
+    &.flow.reverse {
+      animation-name: flow-reverse;
+    }
   }
 
   &__panel-title {
-    font-size: 0.72rem;
+    font-size: 0.9em;
     color: #94a3b8;
     padding: 0.2rem 0.15rem;
   }
@@ -734,6 +835,40 @@ onBeforeUnmount(() => {
       cursor: grabbing;
     }
   }
+
+  &__resize {
+    position: absolute;
+    width: 0.55rem;
+    height: 0.55rem;
+    margin: 0;
+    padding: 0;
+    border: 1.5px solid #67e8f9;
+    background: #0f172a;
+    border-radius: 0.1rem;
+    z-index: 4;
+    box-shadow: 0 0 0 1px rgba(8, 18, 32, 0.85);
+
+    &.is-nw {
+      left: -0.28rem;
+      top: -0.28rem;
+      cursor: nwse-resize;
+    }
+    &.is-ne {
+      right: -0.28rem;
+      top: -0.28rem;
+      cursor: nesw-resize;
+    }
+    &.is-sw {
+      left: -0.28rem;
+      bottom: -0.28rem;
+      cursor: nesw-resize;
+    }
+    &.is-se {
+      right: -0.28rem;
+      bottom: -0.28rem;
+      cursor: nwse-resize;
+    }
+  }
 }
 
 .mono {
@@ -749,6 +884,12 @@ onBeforeUnmount(() => {
 @keyframes flow {
   to {
     background-position: -200% 0;
+  }
+}
+
+@keyframes flow-reverse {
+  to {
+    background-position: 200% 0;
   }
 }
 </style>

@@ -258,67 +258,25 @@ function createEndSealPillow(opts: SoftPackMeshOptions): THREE.BufferGeometry {
   geo.userData.seal = seal
   geo.userData.totalW = totalW
   geo.userData.filmW = filmW
-  geo.userData.uvVersion = 'product-pack-v18'
+  geo.userData.uvVersion = 'product-pack-v19'
   geo.userData.orient = 'product-flange'
   return geo
 }
 
+/**
+ * 自立袋 / 三边封：与枕袋同一套「正栏 + 左右封翅」刀模 1:1 建网。
+ * 旧版 upright 砖只有正面宽、无封翅，会把「外宽」误标成 95（应为 正+2封）。
+ */
 function createUprightSoftBrick(opts: SoftPackMeshOptions): THREE.BufferGeometry {
-  const dims = opts.dims
-  const type = String(dims.productType || '').toUpperCase()
-  const face = Math.max(8, dims.mainFaceWidth)
-  const side = Math.max(4, dims.sideWidth)
-  const bodyH = Math.max(20, opts.height ?? dims.height ?? 90)
-  const depthMm = Math.max(side * 2, 24)
-  const halfD = depthMm * 0.5
-  const halfW = face * 0.5
-  const halfH = bodyH * 0.5
-  const segY = Math.max(24, opts.heightSegments ?? 32)
-  const segC = Math.max(48, opts.radialSegments ?? 64)
-  const n = 3.5
-
-  const posArr: number[] = []
-  const uvArr: number[] = []
-  const idxArr: number[] = []
-
-  for (let iy = 0; iy <= segY; iy++) {
-    const ty = iy / segY
-    const y = -halfH + ty * bodyH
-    for (let ic = 0; ic <= segC; ic++) {
-      const tc = ic / segC
-      const ang = tc * Math.PI * 2
-      const { y: yy, z } = sectionYZ(ang, halfW, halfD, n)
-      posArr.push(yy, y, z)
-      uvArr.push(tc, 1 - ty)
-    }
-  }
-  for (let iy = 0; iy < segY; iy++) {
-    for (let ic = 0; ic < segC; ic++) {
-      const a = iy * (segC + 1) + ic
-      const b = a + segC + 1
-      idxArr.push(a, a + 1, b, b, a + 1, b + 1)
-    }
-  }
-
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3))
-  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvArr, 2))
-  geo.setIndex(idxArr)
-  finishNormals(geo)
-
-  geo.userData.formed = {
-    productType: type,
-    label: type === 'STAND_UP_POUCH' ? '自立袋' : '三边封',
-    width: Math.round(face * 10) / 10,
-    height: Math.round(bodyH * 10) / 10,
-    depth: Math.round(depthMm * 10) / 10,
-    source: 'procedural',
-  }
-  geo.userData.halfFace = halfW
-  geo.userData.halfW = halfW
-  geo.userData.halfH = halfH
-  geo.userData.halfDMax = halfD
-  geo.userData.orient = 'upright'
+  const geo = createEndSealPillow(opts)
+  const type = String(opts.dims.productType || '').toUpperCase()
+  const formed = (geo.userData.formed || {}) as Record<string, unknown>
+  formed.productType = type
+  formed.label = type === 'STAND_UP_POUCH' ? '自立袋' : '三边封'
+  formed.source = 'procedural-1to1'
+  geo.userData.formed = formed
+  geo.userData.orient = 'upright-flange'
+  geo.userData.uvVersion = 'product-pack-v19'
   return geo
 }
 

@@ -170,7 +170,12 @@
         </thead>
         <tbody>
           <tr v-for="d in devices" :key="d.id">
-            <td>{{ d.name }}</td>
+            <td>
+              {{ d.name }}
+              <span v-if="d.shared" class="share-badge" :title="'协同 ' + (d.sharedPermission || 'READ')">
+                共享{{ d.sharedPermission === 'WRITE' ? '·可写' : '·只读' }}
+              </span>
+            </td>
             <td class="mono">{{ d.host }}:{{ d.port }} r{{ d.rack }}/s{{ d.slot }}</td>
             <td>
               <span v-if="d.agentId" class="mono" :class="agentOnline(d.agentId) ? 'ok' : 'warn'">
@@ -198,10 +203,22 @@
               </div>
             </td>
             <td class="ops">
-              <button type="button" class="link" @click="openEdit(d)">编辑</button>
+              <button
+                v-if="!d.shared || d.sharedPermission === 'WRITE'"
+                type="button"
+                class="link"
+                @click="openEdit(d)">
+                编辑
+              </button>
               <button type="button" class="link" @click="start(d.id)">启动</button>
               <button type="button" class="link" @click="stop(d.id)">停止</button>
-              <button type="button" class="link danger" @click="remove(d.id)">删除</button>
+              <button
+                v-if="!d.shared"
+                type="button"
+                class="link danger"
+                @click="remove(d.id)">
+                删除
+              </button>
             </td>
           </tr>
           <tr v-if="!devices.length">
@@ -780,6 +797,16 @@ onMounted(reloadAll)
     flex-wrap: wrap;
     gap: 0.55rem;
   }
+}
+
+.share-badge {
+  margin-left: 0.4rem;
+  font-size: 0.65rem;
+  color: #a5f3fc;
+  border: 1px solid rgba(110, 200, 232, 0.35);
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.35rem;
+  vertical-align: middle;
 }
 
 .tag-preview {

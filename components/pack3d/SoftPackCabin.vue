@@ -143,7 +143,13 @@
 </template>
 
 <script setup lang="ts">
-import { fetchTaskStatus, packageWsUrl, submitAnalyze, type SoftPackDims } from '~/utils/pack3d/api'
+import {
+  fetchTaskStatus,
+  packageWsAuthProtocols,
+  packageWsUrl,
+  submitAnalyze,
+  type SoftPackDims,
+} from '~/utils/pack3d/api'
 import { normalizeSoftPackDims } from '~/utils/pack3d/softPackMesh'
 import { RobustWebSocket, type WsStatus } from '~/utils/fieldpulse/RobustWebSocket'
 import {
@@ -285,7 +291,7 @@ const meshKey = computed(() => {
   const d = dims.value
   if (!d) return 'empty'
   return [
-    'product-pack-v17',
+    'product-pack-v19',
     d.productType || 'PILLOW',
     d.totalWidth,
     d.sealWidth,
@@ -544,6 +550,7 @@ function ensureWs() {
         client?.send({ type: 'subscribe', taskId: taskId.value })
       }
     },
+    packageWsAuthProtocols(),
   )
   client.connect()
 }
@@ -566,6 +573,16 @@ function onWsMessage(data: unknown) {
   } else if (type === 'result') {
     applyResult(msg, 'ws')
   } else if (type === 'error') {
+    // submit 刚返回时偶发 registry 尚未可见：短重试一次订阅
+    const errMsg = String(msg.message || '')
+    if (/未知任务/.test(errMsg) && taskId.value && busy.value) {
+      window.setTimeout(() => {
+        if (taskId.value && busy.value) {
+          client?.send({ type: 'subscribe', taskId: taskId.value })
+        }
+      }, 200)
+      return
+    }
     applyError(msg)
   }
 }

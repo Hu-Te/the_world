@@ -8,10 +8,21 @@
         v-if="loggedIn"
         type="button"
         class="iam-login-fixed__out"
+        @click.stop="openPwd = true">
+        改密
+      </button>
+      <button
+        v-if="loggedIn"
+        type="button"
+        class="iam-login-fixed__out"
         @click.stop="onLogout">
         退出
       </button>
     </div>
+    <IamChangePasswordModal
+      v-model:open="openPwd"
+      @success="onPwdSuccess"
+      @close="openPwd = false" />
   </Teleport>
 </template>
 
@@ -19,9 +30,14 @@
 /** 右上角高亮「登录」——Teleport 到 body，避免被 layout overflow / 3D 层盖住。 */
 const emit = defineEmits<{ open: [] }>()
 
+const IamChangePasswordModal = defineAsyncComponent(
+  () => import('~/components/iam/ChangePasswordModal.vue'),
+)
+
 const auth = useAuthStore()
 const loggedIn = computed(() => auth.isLoggedIn)
 const label = computed(() => (auth.isLoggedIn ? '进入系统' : '登录'))
+const openPwd = ref(false)
 
 onMounted(() => {
   try {
@@ -37,6 +53,11 @@ function onClick() {
 
 async function onLogout() {
   await auth.logout()
+}
+
+async function onPwdSuccess() {
+  await auth.logout()
+  await navigateTo('/login')
 }
 </script>
 

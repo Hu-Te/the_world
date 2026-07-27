@@ -21,9 +21,13 @@
         <ol class="fp-modal__steps">
           <li>点下方按钮下载，等进度走完；浏览器会保存 <code>fieldpulse-agent-windows.zip</code></li>
           <li><strong>解压</strong>到任意文件夹（勿在压缩包里直接双击）</li>
-          <li>记事本打开 <code>agent.env</code>，只改 <code>APP_API_TOKEN=</code> 为与网站相同的 Token</li>
+          <li>
+            记事本打开 <code>agent.env</code>，将 <code>APP_API_TOKEN=</code> 改为与网站相同的部署 Token
+            （向运维索取 <code>deploy.env</code> / 服务器 <code>website.env</code> 中的值；
+            <strong>网页没有「生成 Token」入口</strong>）
+          </li>
           <li>双击 <code>start-agent.bat</code>，看到 <code>connected OK</code> 后<strong>保持窗口打开</strong></li>
-          <li>回到本页点「刷新代理」，下拉选中该 agent，再启动会话</li>
+          <li>回到 Agent 舰队页点「刷新」，列表出现在线 agent；设备/会话里绑定该 agentId</li>
         </ol>
 
         <div class="fp-modal__cmd">
@@ -102,7 +106,7 @@ const cloudHost = computed(() => {
 const envSample = computed(() => {
   return [
     `FIELDPULSE_CLOUD_WS=wss://${cloudHost.value}/ws/fieldpulse/agent`,
-    'APP_API_TOKEN=与网站相同的Token',
+    'APP_API_TOKEN=向运维索取的网站部署Token',
     'FIELDPULSE_AGENT_ID=plant-a',
     'FIELDPULSE_AGENT_NAME=车间A',
   ].join('\n')

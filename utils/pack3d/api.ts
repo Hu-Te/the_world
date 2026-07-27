@@ -26,30 +26,31 @@ export async function fetchTaskStatus(taskId: string): Promise<SoftPackTaskStatu
   return apiFetch<SoftPackTaskStatus>(`/api/package/tasks/${encodeURIComponent(taskId)}`)
 }
 
-/** 开发态直连 Java:8787；生产走同域 /ws/package（握手带用户 JWT）。 */
+/** 开发态直连 Java:8787；生产走同域 /ws/package（JWT 走 Sec-WebSocket-Protocol）。 */
 export function packageWsUrl(): string {
   const config = useRuntimeConfig()
-  const auth = useAuthStore()
-  if (import.meta.client) auth.hydrate()
-  const token = auth.accessToken || ''
   const explicit =
     String(config.public.wsOrigin || '').trim() ||
     String(config.public.apiOrigin || '').trim()
 
-  let base: string
   if (explicit) {
     const u = new URL(explicit)
     const proto = u.protocol === 'https:' ? 'wss:' : 'ws:'
-    base = `${proto}//${u.host}/ws/package`
-  } else if (import.meta.dev) {
+    return `${proto}//${u.host}/ws/package`
+  }
+  if (import.meta.dev) {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const port = String(config.public.devBackendPort || '8787')
-    base = `${proto}//${location.hostname}:${port}/ws/package`
-  } else {
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-    base = `${proto}//${location.host}/ws/package`
+    return `${proto}//${location.hostname}:${port}/ws/package`
   }
-  if (!token) return base
-  const sep = base.includes('?') ? '&' : '?'
-  return `${base}${sep}token=${encodeURIComponent(token)}`
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${proto}//${location.host}/ws/package`
+}
+
+export function packageWsAuthProtocols(): string[] | undefined {
+  const auth = useAuthStore()
+  if (import.meta.client) auth.hydrate()
+  const token = auth.accessToken || ''
+  if (!token) return undefined
+  return ['fp.jwt', token]
 }

@@ -538,8 +538,9 @@ export function updateGeometryUVs(
 
   geometry.setAttribute('uv', new THREE.BufferAttribute(uvArr, 2))
   geometry.attributes.uv.needsUpdate = true
-  geometry.userData.uvVersion = 'product-pack-v17'
-  geometry.userData.filmW = face
+  geometry.userData.uvVersion = 'product-pack-v19'
+  // 调试条「成型宽→膜宽」：保留全膜宽，勿用正栏宽覆盖（否则 115→95 像缩水）
+  geometry.userData.filmW = mode === 'panels' && !atlas ? face : filmW
   geometry.userData.totalW = formedW
 }
 

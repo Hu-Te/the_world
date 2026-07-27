@@ -23,6 +23,9 @@ export type PlcDevice = {
   enabled: boolean
   runtimeDeviceId: string
   sessionActive: boolean
+  /** 经工作协同挂载 */
+  shared?: boolean
+  sharedPermission?: string | null
 }
 
 export type PlcDashboard = {
@@ -61,6 +64,8 @@ export type AlarmEvent = {
   lastOccurredAt: string
   acked: boolean
   ackedAt: string | null
+  /** false=规则已删后的历史残留 */
+  ruleExists?: boolean
 }
 
 export type TrendSeries = {
@@ -168,6 +173,11 @@ export function clearAlarms(ackedOnly?: boolean) {
   return apiFetch<number>(`${BASE}/alarms${q}`, { method: 'DELETE' })
 }
 
+/** 清除规则已不存在的孤儿事件 */
+export function clearOrphanAlarms() {
+  return apiFetch<number>(`${BASE}/alarms/orphans`, { method: 'DELETE' })
+}
+
 export function fetchTrends(runtimeDeviceId: string, tagKey: string, from?: string, to?: string) {
   const params = new URLSearchParams({ runtimeDeviceId, tagKey })
   if (from) params.set('from', from)
@@ -194,4 +204,196 @@ export async function downloadExport(kind: 'devices.csv' | 'alarms.csv') {
   a.download = `fp-${kind}`
   a.click()
   URL.revokeObjectURL(a.href)
+}
+
+/** 组态：数据库唯一真相 */
+export type ScadaDocumentRemote = {
+  id?: string | number | null
+  name: string
+  width: number
+  height: number
+  nodes: unknown[]
+  updatedAt: string
+  tenantId: string | number
+  ownerUserId: string | number
+  persisted?: boolean
+  revision?: number
+  shared?: boolean
+  sharedPermission?: string | null
+}
+
+export function fetchScadaDocument(sharedId?: string | number) {
+  const q = sharedId != null && sharedId !== '' ? `?sharedId=${sharedId}` : ''
+  return apiFetch<ScadaDocumentRemote>(`${BASE}/scada${q}`)
+}
+
+export function saveScadaDocumentRemote(
+  body: {
+    name: string
+    width: number
+    height: number
+    nodes: unknown[]
+    revision: number
+  },
+  sharedId?: string | number,
+) {
+  const q = sharedId != null && sharedId !== '' ? `?sharedId=${sharedId}` : ''
+  return apiFetch<ScadaDocumentRemote>(`${BASE}/scada${q}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+/** ─── 工作协同 ─────────────────────────────────────────── */
+
+const COLLAB = `${BASE}/collab`
+
+export type CollabSpace = {
+  id: number | string
+  name: string
+  note: string | null
+  ownerUserId: number | string
+  ownerDisplayName?: string | null
+  myRole: string
+  createdAt: string
+}
+
+export type CollabBoard = {
+  contentJson: string
+  revision: number | string
+  updatedByUserId: number | string | null
+  updatedAt: string | null
+}
+
+export type CollabMember = {
+  userId: number | string
+  tenantId: number | string
+  displayName?: string | null
+  username?: string | null
+  role: string
+  joinedAt: string
+}
+
+export type CollabResource = {
+  id: number | string
+  resourceType: string
+  resourceId: number | string
+  resourceLabel?: string | null
+  permission: string
+  ownerTenantId: number | string
+}
+
+export type CollabSpaceDetail = {
+  space: CollabSpace
+  board: CollabBoard
+  members: CollabMember[]
+  resources: CollabResource[]
+}
+
+export type CollabInviteCreated = {
+  inviteId: number | string
+  joinKey: string
+  role: string
+  expiresAt: string
+  maxUses: number
+}
+
+export type CollabInvite = {
+  id: number | string
+  role: string
+  expiresAt: string
+  maxUses: number
+  usedCount: number
+  revoked: boolean
+  createdAt: string | null
+}
+
+export type CollabJoinResult = {
+  spaceId: number | string
+  name: string
+  role: string
+}
+
+export function listCollabSpaces() {
+  return apiFetch<CollabSpace[]>(`${COLLAB}/spaces`)
+}
+
+export function createCollabSpace(body: { name: string; note?: string }) {
+  return apiFetch<CollabSpace>(`${COLLAB}/spaces`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+export function fetchCollabDetail(spaceId: string | number) {
+  return apiFetch<CollabSpaceDetail>(`${COLLAB}/spaces/${spaceId}`)
+}
+
+export function createCollabInvite(
+  spaceId: string | number,
+  body: { role: string; ttlHours?: number; maxUses?: number },
+) {
+  return apiFetch<CollabInviteCreated>(`${COLLAB}/spaces/${spaceId}/invites`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+export function listCollabInvites(spaceId: string | number) {
+  return apiFetch<CollabInvite[]>(`${COLLAB}/spaces/${spaceId}/invites`)
+}
+
+export function revokeCollabInvite(inviteId: string | number) {
+  return apiFetch<null>(`${COLLAB}/invites/${inviteId}`, { method: 'DELETE' })
+}
+
+export function joinCollabSpace(joinKey: string) {
+  return apiFetch<CollabJoinResult>(`${COLLAB}/join`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ joinKey }),
+  })
+}
+
+export function putCollabBoard(
+  spaceId: string | number,
+  body: { contentJson: string; expectedRevision?: number },
+) {
+  return apiFetch<CollabBoard>(`${COLLAB}/spaces/${spaceId}/board`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+export function removeCollabMember(spaceId: string | number, userId: string | number) {
+  return apiFetch<null>(`${COLLAB}/spaces/${spaceId}/members/${userId}`, { method: 'DELETE' })
+}
+
+export function leaveCollabSpace(spaceId: string | number) {
+  return apiFetch<null>(`${COLLAB}/spaces/${spaceId}/leave`, { method: 'POST' })
+}
+
+export function deleteCollabSpace(spaceId: string | number) {
+  return apiFetch<null>(`${COLLAB}/spaces/${spaceId}`, { method: 'DELETE' })
+}
+
+export function grantCollabResource(
+  spaceId: string | number,
+  body: { resourceType: string; resourceId: number | string; permission: string },
+) {
+  return apiFetch<CollabResource>(`${COLLAB}/spaces/${spaceId}/resources`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+export function revokeCollabResource(spaceId: string | number, resourceRowId: string | number) {
+  return apiFetch<null>(`${COLLAB}/spaces/${spaceId}/resources/${resourceRowId}`, {
+    method: 'DELETE',
+  })
 }

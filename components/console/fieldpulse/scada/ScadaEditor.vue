@@ -19,9 +19,55 @@
         <span v-if="ownerLabel" class="scada-editor__owner mono" :title="ownerLabel">{{
           ownerLabel
         }}</span>
+        <div class="scada-editor__edit-ops" role="group" aria-label="编辑">
+          <button
+            type="button"
+            class="scada-editor__btn ghost"
+            :disabled="!selectedIds.length"
+            title="复制到剪贴板 · ⌘/Ctrl+C"
+            @click="copySelection">
+            复制
+          </button>
+          <button
+            type="button"
+            class="scada-editor__btn ghost"
+            :disabled="!clipboard.length"
+            title="粘贴剪贴板内容 · ⌘/Ctrl+V"
+            @click="pasteClipboard">
+            粘贴{{ clipboard.length ? `(${clipboard.length})` : '' }}
+          </button>
+        </div>
+        <div class="scada-editor__align" role="group" aria-label="对齐">
+          <button
+            v-for="a in alignActions"
+            :key="a.mode"
+            type="button"
+            class="scada-editor__btn ghost"
+            :disabled="selectedIds.length < 2"
+            :title="a.title"
+            @click="alignSelection(a.mode)">
+            {{ a.label }}
+          </button>
+        </div>
         <button type="button" class="scada-editor__btn" :disabled="!dirty || !canPersist" @click="saveDoc">
           {{ persistLabel }}
         </button>
+        <button
+          type="button"
+          class="scada-editor__btn ghost danger"
+          :disabled="!canPersist || !doc.nodes.length"
+          title="清空画布全部图元并同步云端"
+          @click="clearDoc">
+          清空
+        </button>
+        <a
+          class="scada-editor__btn ghost"
+          href="/console/fieldpulse/scada-view"
+          target="_blank"
+          rel="noopener"
+          @click="onOpenRuntime">
+          运行屏
+        </a>
         <button type="button" class="scada-editor__btn ghost" @click="exportJson">导出 JSON</button>
         <label class="scada-editor__btn ghost file">
           导入
@@ -34,25 +80,25 @@
       <div
         ref="viewportEl"
         class="scada-editor__viewport"
-        @mousedown.self="selectedId = null">
+        @mousedown.self="clearSelection">
         <div
           class="scada-editor__stage"
           :style="{ width: stageW + 'px', height: stageH + 'px' }"
-          @mousedown.self="selectedId = null">
+          @mousedown.self="clearSelection">
           <div
             class="scada-editor__board"
             :style="boardStyle"
-            @mousedown.self="selectedId = null">
+            @mousedown.self="clearSelection">
             <div class="scada-editor__grid" aria-hidden="true" />
             <ScadaNode
               v-for="n in doc.nodes"
               :key="n.id"
               :node-data="n"
-              :selected="n.id === selectedId"
+              :selected="selectedIds.includes(n.id)"
               :canvas-w="doc.width"
               :canvas-h="doc.height"
               :view-scale="viewScale"
-              @select="selectedId = $event"
+              @select="onSelect"
               @move="onMove"
               @patch="onUpdateNode" />
             <p v-if="!doc.nodes.length" class="scada-editor__empty">
@@ -65,6 +111,7 @@
       <ScadaPropertyPanel
         :node="selectedNode"
         :devices="devices"
+        :selected-count="selectedIds.length"
         @update="onUpdateNode"
         @remove="onRemoveNode" />
     </div>
@@ -79,17 +126,21 @@ import type { PlcDevice } from '~/utils/console/fieldpulseApi'
 import {
   createEmptyScadaDoc,
   createScadaNode,
+  isValidScadaOwner,
+  newNodeId,
   normalizeNode,
-  parseOwnedDocument,
+  parseImportDocument,
+  sameScadaOwner,
   type ScadaDocument,
   type ScadaNodeData,
   type ScadaNodeType,
+  type ScadaOwnerId,
 } from '~/utils/console/scadaTypes'
 
 const props = defineProps<{
   devices: PlcDevice[]
-  tenantId: number
-  userId: number
+  tenantId: ScadaOwnerId
+  userId: ScadaOwnerId
 }>()
 
 const emit = defineEmits<{
@@ -118,7 +169,9 @@ const owner = computed(() => ({
   ownerUserId: props.userId,
 }))
 
-const canPersist = computed(() => props.tenantId > 0 && props.userId > 0)
+const canPersist = computed(() =>
+  isValidScadaOwner({ tenantId: props.tenantId, ownerUserId: props.userId }),
+)
 
 const persistLabel = computed(() => {
   if (!canPersist.value) return '需登录'
@@ -133,12 +186,25 @@ const ownerLabel = computed(() => {
 })
 
 const doc = ref<ScadaDocument>(createEmptyScadaDoc('产线概览'))
-const selectedId = ref<string | null>(null)
+/** 多选：最后一项为属性面板主选 */
+const selectedIds = ref<string[]>([])
+const clipboard = ref<ScadaNodeData[]>([])
 const dirty = ref(false)
 const viewportEl = ref<HTMLElement | null>(null)
 /** 逻辑画布 → 视口的等比缩放，保证铺满且不出现滚动条 */
 const viewScale = ref(1)
 const VIEW_PAD = 12
+const PASTE_OFFSET = 24
+
+type AlignMode = 'left' | 'right' | 'hcenter' | 'top' | 'bottom' | 'vcenter'
+const alignActions: { mode: AlignMode; label: string; title: string }[] = [
+  { mode: 'left', label: '左齐', title: '左对齐' },
+  { mode: 'hcenter', label: '水平中', title: '水平居中对齐' },
+  { mode: 'right', label: '右齐', title: '右对齐' },
+  { mode: 'top', label: '顶齐', title: '顶对齐' },
+  { mode: 'vcenter', label: '垂直中', title: '垂直居中对齐' },
+  { mode: 'bottom', label: '底齐', title: '底对齐' },
+]
 
 const stageW = computed(() => Math.max(1, Math.round(doc.value.width * viewScale.value)))
 const stageH = computed(() => Math.max(1, Math.round(doc.value.height * viewScale.value)))
@@ -149,9 +215,30 @@ const boardStyle = computed(() => ({
   transform: `scale(${viewScale.value})`,
 }))
 
-const selectedNode = computed(
-  () => doc.value.nodes.find((n) => n.id === selectedId.value) ?? null,
-)
+const selectedNode = computed(() => {
+  const id = selectedIds.value[selectedIds.value.length - 1]
+  if (!id) return null
+  return doc.value.nodes.find((n) => n.id === id) ?? null
+})
+
+function clearSelection() {
+  selectedIds.value = []
+}
+
+function onSelect(payload: { id: string; additive: boolean }) {
+  const { id, additive } = payload
+  if (additive) {
+    if (selectedIds.value.includes(id)) {
+      selectedIds.value = selectedIds.value.filter((x) => x !== id)
+    } else {
+      selectedIds.value = [...selectedIds.value, id]
+    }
+    return
+  }
+  // 已在多选组内再点一次：保持多选，便于整体拖动
+  if (selectedIds.value.length > 1 && selectedIds.value.includes(id)) return
+  selectedIds.value = [id]
+}
 
 function measureFit() {
   const el = viewportEl.value
@@ -165,65 +252,74 @@ function measureFit() {
 
 let resizeObserver: ResizeObserver | null = null
 
-function reloadForOwner() {
+async function reloadFromServer(opts?: { quiet?: boolean }) {
   if (!canPersist.value) {
-    // 未登录：只展示空稿，禁止用空稿覆盖已缓存的登录用户画面
     doc.value = createEmptyScadaDoc('产线概览')
     dirty.value = false
-    selectedId.value = null
+    selectedIds.value = []
     return
   }
-  const loaded = scadaStore.load(owner.value)
-  doc.value = loaded
-  dirty.value = false
-  selectedId.value = null
-  if (loaded.nodes.length > 0) {
-    emit('restored', loaded.nodes.length)
+  try {
+    const loaded = await scadaStore.load(owner.value)
+    doc.value = loaded
+    dirty.value = false
+    selectedIds.value = []
+    if (!opts?.quiet && loaded.nodes.length > 0) {
+      emit('restored', loaded.nodes.length)
+    }
+  } catch (e) {
+    emit('error', e instanceof Error ? e.message : String(e))
   }
 }
 
 watch(
   () => [props.tenantId, props.userId] as const,
-  () => reloadForOwner(),
+  () => {
+    void reloadFromServer()
+  },
   { immediate: true },
 )
 
-/** keepalive 切回本页：再从磁盘/内存合并一次，修复空稿误显 */
-function reloadFromCache() {
-  reloadForOwner()
-  nextTick(() => measureFit())
+/** keepalive / 焦点 / 同伴保存：有未保存编辑时不覆盖 */
+function reloadIfClean() {
+  if (dirty.value) {
+    nextTick(() => measureFit())
+    return
+  }
+  void reloadFromServer({ quiet: true }).then(() => nextTick(() => measureFit()))
 }
 
 function markDirty() {
   dirty.value = true
   if (!canPersist.value) return
-  doc.value.updatedAt = new Date().toISOString()
   doc.value.tenantId = owner.value.tenantId
   doc.value.ownerUserId = owner.value.ownerUserId
-  scadaStore.remember(doc.value, owner.value)
 }
 
-function saveDoc() {
+function onOpenRuntime(e: MouseEvent) {
+  e.preventDefault()
+  if (dirty.value) {
+    const ok = confirm('有未保存修改，打开运行屏将看到数据库中的旧稿。仍要打开？')
+    if (!ok) return
+  }
+  window.open('/console/fieldpulse/scada-view', '_blank', 'noopener')
+}
+
+async function saveDoc() {
+  if (!canPersist.value) {
+    emit('error', '请先登录后再保存')
+    return
+  }
   try {
     const orphans = countOrphanBinds()
-    const stamped = scadaStore.save(doc.value, owner.value)
-    if (stamped) {
-      doc.value = stamped
-      dirty.value = false
-      emit('saved', doc.value)
-    } else if (!doc.value.nodes.length) {
-      // 空稿被拒写：拉回磁盘非空稿
-      const recovered = scadaStore.load(owner.value)
-      if (recovered.nodes.length > 0) {
-        doc.value = recovered
-        dirty.value = false
-        emit('restored', recovered.nodes.length)
-        emit('error', '当前为空画面，已从本机缓存恢复组态，未覆盖原文件')
-        return
-      }
-      emit('error', '空画面未写入缓存（避免覆盖已有组态）')
-      return
+    if (!doc.value.nodes.length) {
+      const ok = confirm('确认将空画面保存到数据库？（将覆盖云端当前设计稿）')
+      if (!ok) return
     }
+    const stamped = await scadaStore.save(doc.value, owner.value)
+    doc.value = stamped
+    dirty.value = false
+    emit('saved', doc.value)
     if (orphans > 0) {
       emit('error', `已保存，但有 ${orphans} 个图元绑定点位不在当前台账（设备改址或已删除）`)
     }
@@ -232,21 +328,31 @@ function saveDoc() {
   }
 }
 
-/** 离开页面 / 关页：强制内存与 localStorage 对齐（空稿不会覆盖非空磁盘） */
-function flushPersist() {
+async function clearDoc() {
   if (!canPersist.value) return
+  const n = doc.value.nodes.length
+  if (!n) return
+  const ok = confirm(`确认清空组态？将删除 ${n} 个图元并写入数据库。此操作不可撤销。`)
+  if (!ok) return
+  selectedIds.value = []
+  doc.value = {
+    ...doc.value,
+    nodes: [],
+    tenantId: owner.value.tenantId,
+    ownerUserId: owner.value.ownerUserId,
+  }
+  dirty.value = true
   try {
-    const stamped = scadaStore.flush(doc.value, owner.value)
-    if (stamped) {
-      doc.value = stamped
-      dirty.value = false
-    }
+    const stamped = await scadaStore.save(doc.value, owner.value)
+    doc.value = stamped
+    dirty.value = false
+    emit('saved', doc.value)
   } catch (e) {
     emit('error', e instanceof Error ? e.message : String(e))
   }
 }
 
-defineExpose({ flushPersist, saveDoc, reloadFromCache })
+defineExpose({ saveDoc, reloadIfClean })
 
 function countOrphanBinds() {
   const valid = new Set<string>()
@@ -270,15 +376,38 @@ function addNode(type: ScadaNodeType) {
   n.x = Math.min(n.x, Math.max(0, doc.value.width - n.w))
   n.y = Math.min(n.y, Math.max(0, doc.value.height - n.h))
   doc.value.nodes.push(n)
-  selectedId.value = n.id
+  selectedIds.value = [n.id]
   markDirty()
+}
+
+function clampNodePos(n: Pick<ScadaNodeData, 'x' | 'y' | 'w' | 'h'>) {
+  return {
+    x: Math.min(Math.max(0, n.x), Math.max(0, doc.value.width - n.w)),
+    y: Math.min(Math.max(0, n.y), Math.max(0, doc.value.height - n.h)),
+  }
 }
 
 function onMove(payload: { id: string; x: number; y: number }) {
   const n = doc.value.nodes.find((x) => x.id === payload.id)
   if (!n) return
-  n.x = payload.x
-  n.y = payload.y
+  const dx = payload.x - n.x
+  const dy = payload.y - n.y
+  const group =
+    selectedIds.value.includes(payload.id) && selectedIds.value.length > 1
+      ? selectedIds.value
+      : [payload.id]
+  for (const id of group) {
+    const node = doc.value.nodes.find((x) => x.id === id)
+    if (!node) continue
+    const next = clampNodePos({
+      x: node.x + dx,
+      y: node.y + dy,
+      w: node.w,
+      h: node.h,
+    })
+    node.x = next.x
+    node.y = next.y
+  }
   markDirty()
 }
 
@@ -291,15 +420,80 @@ function onUpdateNode(patch: Partial<ScadaNodeData> & { id: string }) {
     ...patch,
     style: patch.style ? { ...(cur.style || {}), ...patch.style } : cur.style,
   })
-  next.x = Math.min(Math.max(0, next.x), Math.max(0, doc.value.width - next.w))
-  next.y = Math.min(Math.max(0, next.y), Math.max(0, doc.value.height - next.h))
+  const pos = clampNodePos(next)
+  next.x = pos.x
+  next.y = pos.y
   doc.value.nodes[i] = next
   markDirty()
 }
 
 function onRemoveNode(id: string) {
-  doc.value.nodes = doc.value.nodes.filter((n) => n.id !== id)
-  if (selectedId.value === id) selectedId.value = null
+  const drop = selectedIds.value.includes(id) ? new Set(selectedIds.value) : new Set([id])
+  doc.value.nodes = doc.value.nodes.filter((n) => !drop.has(n.id))
+  selectedIds.value = selectedIds.value.filter((x) => !drop.has(x))
+  markDirty()
+}
+
+function selectedNodes(): ScadaNodeData[] {
+  const set = new Set(selectedIds.value)
+  return doc.value.nodes.filter((n) => set.has(n.id))
+}
+
+function alignSelection(mode: AlignMode) {
+  const nodes = selectedNodes()
+  if (nodes.length < 2) return
+  const left = Math.min(...nodes.map((n) => n.x))
+  const top = Math.min(...nodes.map((n) => n.y))
+  const right = Math.max(...nodes.map((n) => n.x + n.w))
+  const bottom = Math.max(...nodes.map((n) => n.y + n.h))
+  const cx = (left + right) / 2
+  const cy = (top + bottom) / 2
+  for (const n of nodes) {
+    if (mode === 'left') n.x = left
+    else if (mode === 'right') n.x = right - n.w
+    else if (mode === 'hcenter') n.x = Math.round(cx - n.w / 2)
+    else if (mode === 'top') n.y = top
+    else if (mode === 'bottom') n.y = bottom - n.h
+    else if (mode === 'vcenter') n.y = Math.round(cy - n.h / 2)
+    const pos = clampNodePos(n)
+    n.x = pos.x
+    n.y = pos.y
+  }
+  markDirty()
+}
+
+function cloneNodeData(n: ScadaNodeData): ScadaNodeData {
+  // Vue 响应式 Proxy 不能 structuredClone，用 JSON 深拷贝
+  return normalizeNode(JSON.parse(JSON.stringify(toRaw(n))) as ScadaNodeData)
+}
+
+function cloneNodesWithOffset(source: ScadaNodeData[], dx: number, dy: number): ScadaNodeData[] {
+  return source.map((n) => {
+    const copy = cloneNodeData(n)
+    copy.id = newNodeId()
+    copy.x = n.x + dx
+    copy.y = n.y + dy
+    const pos = clampNodePos(copy)
+    copy.x = pos.x
+    copy.y = pos.y
+    return copy
+  })
+}
+
+/** 仅写入内部剪贴板；不改动画布 */
+function copySelection() {
+  const nodes = selectedNodes()
+  if (!nodes.length) return
+  clipboard.value = nodes.map((n) => cloneNodeData(n))
+}
+
+function pasteClipboard() {
+  if (!clipboard.value.length) return
+  const news = cloneNodesWithOffset(clipboard.value, PASTE_OFFSET, PASTE_OFFSET)
+  // 连续粘贴继续相对上次粘贴位置偏移
+  clipboard.value = news.map((n) => cloneNodeData(n))
+  doc.value.nodes.push(...news)
+  selectedIds.value = news.map((n) => n.id)
   markDirty()
 }
 
@@ -321,35 +515,30 @@ async function importJson(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
   try {
-    if (!canPersist.value) throw new Error('请先登录后再导入，避免写入共享缓存')
+    if (!canPersist.value) throw new Error('请先登录后再导入')
     const text = await file.text()
     const parsed = JSON.parse(text) as ScadaDocument
     if (!parsed?.nodes || !Array.isArray(parsed.nodes)) throw new Error('无效组态 JSON')
-    // 导入后强制改挂到当前用户，防止把别人的归属写进本机键
     if (
       parsed.tenantId != null &&
       parsed.ownerUserId != null &&
-      (Number(parsed.tenantId) !== owner.value.tenantId ||
-        Number(parsed.ownerUserId) !== owner.value.ownerUserId)
-    ) {
-      const ok = confirm(
-        '该 JSON 归属其他租户/用户。导入将改挂到当前账号（不会写回对方存储）。继续？',
+      !sameScadaOwner(
+        { tenantId: parsed.tenantId, ownerUserId: parsed.ownerUserId },
+        owner.value,
       )
+    ) {
+      const ok = confirm('该 JSON 归属其他账号。导入将改挂到当前账号并保存到数据库。继续？')
       if (!ok) return
     }
     const owned =
-      parseOwnedDocument(
-        JSON.stringify({
-          ...parsed,
-          tenantId: owner.value.tenantId,
-          ownerUserId: owner.value.ownerUserId,
-        }),
-        owner.value,
-      ) ?? createEmptyScadaDoc(parsed.name || '产线概览', owner.value)
-    owned.nodes = parsed.nodes.map((n) => normalizeNode(n))
+      parseImportDocument(parsed, owner.value) ??
+      createEmptyScadaDoc(parsed.name || '产线概览', owner.value)
+    // 保留当前 revision，避免覆盖云端时乐观锁失败
+    owned.revision = doc.value.revision
     doc.value = owned
-    selectedId.value = null
-    saveDoc()
+    selectedIds.value = []
+    dirty.value = true
+    await saveDoc()
   } catch (err) {
     emit('error', err instanceof Error ? err.message : String(err))
   } finally {
@@ -360,22 +549,36 @@ async function importJson(e: Event) {
 function onKeydown(e: KeyboardEvent) {
   const tag = (e.target as HTMLElement | null)?.tagName
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return
-  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId.value) {
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.value.length) {
     e.preventDefault()
-    onRemoveNode(selectedId.value)
+    onRemoveNode(selectedIds.value[selectedIds.value.length - 1]!)
   }
   if ((e.key === 's' || e.key === 'S') && (e.metaKey || e.ctrlKey)) {
     e.preventDefault()
     if (canPersist.value) saveDoc()
   }
-  if ((e.key === '[' || e.key === ']') && selectedId.value) {
+  if ((e.key === 'c' || e.key === 'C') && (e.metaKey || e.ctrlKey) && !e.altKey) {
     e.preventDefault()
-    const n = doc.value.nodes.find((x) => x.id === selectedId.value)
-    if (!n) return
+    copySelection()
+  }
+  if ((e.key === 'v' || e.key === 'V') && (e.metaKey || e.ctrlKey) && !e.altKey) {
+    e.preventDefault()
+    pasteClipboard()
+  }
+  if ((e.key === 'a' || e.key === 'A') && (e.metaKey || e.ctrlKey) && !e.altKey) {
+    e.preventDefault()
+    selectedIds.value = doc.value.nodes.map((n) => n.id)
+  }
+  if ((e.key === '[' || e.key === ']') && selectedIds.value.length) {
+    e.preventDefault()
     const step = e.shiftKey ? 90 : 15
     const delta = e.key === ']' ? step : -step
-    const cur = Number(n.rotation) || 0
-    onUpdateNode({ id: n.id, rotation: ((cur + delta) % 360 + 360) % 360 })
+    for (const id of selectedIds.value) {
+      const n = doc.value.nodes.find((x) => x.id === id)
+      if (!n) continue
+      const cur = Number(n.rotation) || 0
+      onUpdateNode({ id: n.id, rotation: ((cur + delta) % 360 + 360) % 360 })
+    }
   }
 }
 
@@ -451,6 +654,9 @@ onBeforeUnmount(() => {
   font-size: 0.66rem;
   font-family: ui-monospace, 'IBM Plex Mono', monospace;
   cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 
   &:disabled {
     opacity: 0.45;
@@ -463,10 +669,27 @@ onBeforeUnmount(() => {
     color: #94a3b8;
   }
 
+  &.danger {
+    border-color: rgba(248, 113, 113, 0.45);
+    color: #fca5a5;
+
+    &:not(:disabled):hover {
+      background: rgba(248, 113, 113, 0.12);
+    }
+  }
+
   &.file {
     display: inline-flex;
     align-items: center;
   }
+}
+
+.scada-editor__edit-ops,
+.scada-editor__align {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.28rem;
 }
 
 .scada-editor__name {

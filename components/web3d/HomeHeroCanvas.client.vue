@@ -16,9 +16,6 @@
 import type { HomeHeroManager } from '~/utils/web3d/HomeHeroManager'
 import type { ToolItem } from '~/utils/tools/catalog'
 
-/** 组件 chunk 一执行就开拉 Three，不等 onMounted */
-const homeHeroManagerPromise = import('~/utils/web3d/HomeHeroManager')
-
 const emit = defineEmits<{
   ready: []
   'drill-open': [id: string]
@@ -42,54 +39,58 @@ let cancelled = false
 
 onMounted(() => {
   cancelled = false
-  void nextTick(async () => {
-    const canvas = canvasRef.value
-    const host = hostRef.value
-    if (!canvas || !host) return
+  // 先让首屏 CSS 壳层完成绘制，再拉 Three，降低 FCP 争抢
+  const start = () => {
+    void nextTick(async () => {
+      const canvas = canvasRef.value
+      const host = hostRef.value
+      if (!canvas || !host) return
 
-    try {
-      const { HomeHeroManager } = await homeHeroManagerPromise
-      if (cancelled) return
-
-      manager = new HomeHeroManager({
-        canvas,
-        onDrillOpen: (id) => {
-          drilling.value = true
-          emit('drill-open', id)
-        },
-        onDrillClose: () => {
-          drilling.value = false
-          emit('drill-close')
-        },
-        onSelectTool: (tool) => emit('select-tool', tool),
-      })
-
-      const applySize = () => {
-        const rect = host.getBoundingClientRect()
-        manager?.resize(Math.max(rect.width, 1), Math.max(rect.height, 1))
-      }
-      applySize()
-
-      // 等真正画出一帧再露 canvas，避免盖住 CSS 壳层后空黑屏
-      requestAnimationFrame(() => {
+      try {
+        const { HomeHeroManager } = await import('~/utils/web3d/HomeHeroManager')
         if (cancelled) return
+
+        manager = new HomeHeroManager({
+          canvas,
+          onDrillOpen: (id) => {
+            drilling.value = true
+            emit('drill-open', id)
+          },
+          onDrillClose: () => {
+            drilling.value = false
+            emit('drill-close')
+          },
+          onSelectTool: (tool) => emit('select-tool', tool),
+        })
+
+        const applySize = () => {
+          const rect = host.getBoundingClientRect()
+          manager?.resize(Math.max(rect.width, 1), Math.max(rect.height, 1))
+        }
         applySize()
-        ready.value = true
-        emit('ready')
-      })
 
-      resizeObserver = new ResizeObserver(applySize)
-      resizeObserver.observe(host)
+        // 等真正画出一帧再露 canvas，避免盖住 CSS 壳层后空黑屏
+        requestAnimationFrame(() => {
+          if (cancelled) return
+          applySize()
+          ready.value = true
+          emit('ready')
+        })
 
-      intersectionObserver = new IntersectionObserver(
-        ([entry]) => manager?.setInViewport(Boolean(entry?.isIntersecting)),
-        { threshold: 0 },
-      )
-      intersectionObserver.observe(host)
-    } catch (err) {
-      console.error('[HomeHeroCanvas] init failed', err)
-    }
-  })
+        resizeObserver = new ResizeObserver(applySize)
+        resizeObserver.observe(host)
+
+        intersectionObserver = new IntersectionObserver(
+          ([entry]) => manager?.setInViewport(Boolean(entry?.isIntersecting)),
+          { threshold: 0 },
+        )
+        intersectionObserver.observe(host)
+      } catch (err) {
+        console.error('[HomeHeroCanvas] init failed', err)
+      }
+    })
+  }
+  requestAnimationFrame(() => requestAnimationFrame(start))
 })
 
 onUnmounted(() => {

@@ -225,31 +225,44 @@ export async function s7BatchRead(body: {
   })
 }
 
-/** 浏览器遥测 WS：用户 JWT（或部署 Token）query，与握手拦截器对齐 */
-export function wsUrl(): string {
+/** 双轨 WS：tools=工具舱匿名/可选 JWT；console=管控台强制 JWT+模块 */
+export type FieldPulseWsTrack = 'tools' | 'console'
+
+/** 与后端 ApiTokenAuthenticator.WS_JWT_PROTOCOL 对齐 */
+export const WS_JWT_PROTOCOL = 'fp.jwt'
+
+/**
+ * 浏览器遥测 WS URL（不含 token）。
+ * - tools → `/ws/fieldpulse`（首页工具舱）
+ * - console → `/ws/console/fieldpulse`（进阶管控，须登录 JWT）
+ */
+export function wsUrl(track: FieldPulseWsTrack = 'tools'): string {
   const config = useRuntimeConfig()
-  const token = fieldPulseAccessToken()
+  const path = track === 'console' ? '/ws/console/fieldpulse' : '/ws/fieldpulse'
   /** 优先 wsOrigin，其次 apiOrigin；开发态无配置时直连 Java:8787（避免 Nuxt 对 /ws Upgrade 404） */
   const explicit =
     String(config.public.wsOrigin || '').trim() ||
     String(config.public.apiOrigin || '').trim()
 
-  let base: string
   if (explicit) {
     const u = new URL(explicit)
     const proto = u.protocol === 'https:' ? 'wss:' : 'ws:'
-    base = `${proto}//${u.host}/ws/fieldpulse`
-  } else if (import.meta.dev) {
+    return `${proto}//${u.host}${path}`
+  }
+  if (import.meta.dev) {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const port = String(config.public.devBackendPort || '8787')
-    base = `${proto}//${location.hostname}:${port}/ws/fieldpulse`
-  } else {
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-    base = `${proto}//${location.host}/ws/fieldpulse`
+    return `${proto}//${location.hostname}:${port}${path}`
   }
-  if (!token) return base
-  const sep = base.includes('?') ? '&' : '?'
-  return `${base}${sep}token=${encodeURIComponent(token)}`
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${proto}//${location.host}${path}`
+}
+
+/** Sec-WebSocket-Protocol：`fp.jwt` + JWT，避免 Query 泄露 */
+export function wsAuthProtocols(): string[] | undefined {
+  const token = fieldPulseAccessToken()
+  if (!token) return undefined
+  return [WS_JWT_PROTOCOL, token]
 }
 
 /** 现场 Agent 云端 WS 基址（Token 由 Agent 本机 APP_API_TOKEN 配置，勿写入浏览器）。 */

@@ -4,10 +4,12 @@ type Handler = (data: unknown) => void
 
 /**
  * 健壮 WebSocket：指数退避重连 + ping 心跳 + 状态回调。
+ * protocols 用于 Sec-WebSocket-Protocol（如 fp.jwt + JWT），避免 token 进 Query。
  */
 export class RobustWebSocket {
   private ws: WebSocket | null = null
   private url: string
+  private protocols: string[] | undefined
   private status: WsStatus = 'closed'
   private attempt = 0
   private closedByUser = false
@@ -21,12 +23,14 @@ export class RobustWebSocket {
     url: string,
     onMessage: Handler,
     onStatus: (s: WsStatus) => void,
-    onOpen?: () => void,
+    onOpen?: (() => void) | null,
+    protocols?: string[] | null,
   ) {
     this.url = url
     this.onMessage = onMessage
     this.onStatus = onStatus
     this.onOpen = onOpen ?? null
+    this.protocols = protocols?.length ? [...protocols] : undefined
   }
 
   connect() {
@@ -57,7 +61,9 @@ export class RobustWebSocket {
   private open() {
     this.clearTimers()
     this.setStatus(this.attempt > 0 ? 'reconnecting' : 'connecting')
-    const ws = new WebSocket(this.url)
+    const ws = this.protocols?.length
+      ? new WebSocket(this.url, this.protocols)
+      : new WebSocket(this.url)
     this.ws = ws
     ws.onopen = () => {
       this.attempt = 0

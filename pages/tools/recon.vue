@@ -17,49 +17,14 @@
       </div>
 
       <!-- 顶栏：始终精简 -->
-      <header class="recon-modal__head">
-        <div class="recon-modal__brand">
-          <div class="recon-modal__eyebrow">
-            <span class="recon-modal__code">FIN · RECON</span>
-            <span class="recon-modal__pulse" aria-hidden="true" />
-            <span class="recon-modal__badge">智能校对 · 自动</span>
-            <span v-if="detail" class="recon-modal__taskid">#{{ detail.id }}</span>
-          </div>
-          <div class="recon-modal__title-row">
-            <h1 id="recon-modal-title" class="recon-modal__title">
-              {{ detail?.title || '银行存款勾稽' }}
-            </h1>
-            <nav v-if="!detail" class="recon-modal__samples">
-              <a href="/samples/recon-corp.csv" download>样例·企业</a>
-              <a href="/samples/recon-bank.csv" download>样例·银行</a>
-            </nav>
-          </div>
-          <p class="recon-modal__trust">
-            HTTPS 传输；任务密钥仅存本机；关闭本页/删除/超时后服务端物理删除明细，无全站共享列表
-          </p>
-        </div>
-        <div class="recon-modal__head-acts">
-          <button
-            v-if="detail"
-            type="button"
-            class="recon-btn recon-btn--ghost"
-            :disabled="busy"
-            @click="setupOpen = !setupOpen">
-            {{ setupOpen ? '收起配置' : '配置' }}
-          </button>
-          <button
-            v-if="detail"
-            type="button"
-            class="recon-btn recon-btn--ghost"
-            :disabled="busy"
-            @click="removeCurrentTask">
-            删除
-          </button>
-          <button type="button" class="recon-modal__close" aria-label="关闭" @click="goHome">
-            ✕
-          </button>
-        </div>
-      </header>
+      <ReconModalHead
+        :title="detail?.title"
+        :task-id="detail?.id"
+        :busy="busy"
+        :setup-open="setupOpen"
+        @toggle-setup="setupOpen = !setupOpen"
+        @remove="removeCurrentTask"
+        @close="goHome" />
 
       <div class="recon-modal__body">
         <!-- 配置区：空态完整展示；有结果默认收起 -->
@@ -308,6 +273,7 @@
 </template>
 
 <script setup lang="ts">
+import ReconModalHead from '~/components/recon/ReconModalHead.vue'
 import {
   aiAssistRecon,
   confirmFuzzyRecon,

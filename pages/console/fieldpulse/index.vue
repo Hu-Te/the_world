@@ -12,7 +12,7 @@
           <p class="dash__eyebrow">STATUS · OVERVIEW</p>
           <h3 class="dash__hero-title">舱况一览</h3>
           <p class="dash__hero-lead">
-            租户内设备、会话与报警的实时聚合。细粒度调试请用工具舱「工脉监听舱」。
+            系统内设备、会话与报警的实时聚合。细粒度调试请用工具舱「工脉监听舱」。
           </p>
         </div>
         <NuxtLink class="dash__tool-link" to="/tools/fieldpulse">打开工脉监听舱 →</NuxtLink>

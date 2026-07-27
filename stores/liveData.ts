@@ -1,13 +1,14 @@
 import { defineStore } from 'pinia'
-import { wsUrl } from '~/utils/fieldpulse/api'
+import { wsAuthProtocols, wsUrl } from '~/utils/fieldpulse/api'
 import { RobustWebSocket, type WsStatus } from '~/utils/fieldpulse/RobustWebSocket'
 
 /**
- * FieldPulse 实时点位枢纽。
+ * FieldPulse 管控台实时点位枢纽（进阶轨）。
  *
  * Key 规范（与监控页 / 组态 bindTag 统一）：
  *   `${runtimeDeviceId}::${tagKey}`
  *
+ * 连接 `/ws/console/fieldpulse`（JWT + FIELDPULSE）；与首页工具舱 `/ws/fieldpulse` 隔离。
  * WebSocket 批量推送经 rAF 合并写入，避免每包触发全量渲染。
  */
 
@@ -115,11 +116,13 @@ function connectLiveWs(store: LiveStore) {
   if (!import.meta.client) return
   disconnectLiveWs()
   client = new RobustWebSocket(
-    wsUrl(),
+    wsUrl('console'),
     (data) => onWsMessage(store, data),
     (s) => {
       store.wsStatus = s
     },
+    null,
+    wsAuthProtocols(),
   )
   client.connect()
   ageTimer = setInterval(() => refreshAges(store), 250)

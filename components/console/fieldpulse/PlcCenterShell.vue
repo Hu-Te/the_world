@@ -78,8 +78,10 @@ const nav = [
   { code: '03', label: '实时监控', to: '/console/fieldpulse/monitor' },
   { code: '04', label: '报警中心', to: '/console/fieldpulse/alarms' },
   { code: '05', label: '历史曲线', to: '/console/fieldpulse/trends' },
-  { code: '06', label: '组态大屏', to: '/console/fieldpulse/scada' },
+  { code: '06', label: '组态设计', to: '/console/fieldpulse/scada' },
+  { code: '06b', label: '运行显示', to: '/console/fieldpulse/scada-view' },
   { code: '07', label: 'Agent 舰队', to: '/console/fieldpulse/agents' },
+  { code: '08', label: '工作协同', to: '/console/fieldpulse/collab' },
 ]
 
 onMounted(() => auth.hydrate())
@@ -178,8 +180,9 @@ onMounted(() => auth.hydrate())
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
   overflow: hidden;
 
-  /* 组态大屏：铺满视口，避免左右留白 + 双层滚动 */
-  &:has(.scada-page) {
+  /* 组态设计/运行：铺满视口，避免左右留白 + 双层滚动 */
+  &:has(.scada-page),
+  &:has(.scada-view) {
     width: calc(100% - 1rem);
     height: calc(100dvh - 1rem);
     max-width: none;
@@ -422,25 +425,29 @@ onMounted(() => auth.hydrate())
   overflow: auto;
   padding: 1.1rem 1.35rem 1.5rem;
 
-  /* 组态页需要占满剩余高度，避免双层滚动 */
-  &:has(.scada-page) {
+  /* 组态设计/运行：占满剩余高度，避免双层滚动 */
+  &:has(.scada-page),
+  &:has(.scada-view) {
     overflow: hidden;
     display: flex;
     flex-direction: column;
     padding: 0.45rem 0.75rem 0.55rem;
   }
 
-  &:has(.scada-page) > .scada-page {
+  &:has(.scada-page) > .scada-page,
+  &:has(.scada-view) > .scada-view {
     flex: 1;
     min-height: 0;
   }
 }
 
-.plc-cabin__stage:has(.scada-page) .plc-cabin__stage-head {
+.plc-cabin__stage:has(.scada-page) .plc-cabin__stage-head,
+.plc-cabin__stage:has(.scada-view) .plc-cabin__stage-head {
   padding: 0.55rem 0.9rem 0.45rem;
 }
 
-.plc-cabin__stage:has(.scada-page) .plc-cabin__stage-title {
+.plc-cabin__stage:has(.scada-page) .plc-cabin__stage-title,
+.plc-cabin__stage:has(.scada-view) .plc-cabin__stage-title {
   font-size: 1.1rem;
 }
 

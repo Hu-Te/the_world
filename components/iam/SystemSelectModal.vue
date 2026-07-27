@@ -34,22 +34,32 @@
         <p v-else class="iam-sys__empty">当前账号暂无平台子系统，请联系管理员分配套餐。</p>
 
         <footer class="iam-sys__foot">
+          <button type="button" class="iam-sys__ghost" @click="openPwd = true">修改密码</button>
           <button type="button" class="iam-sys__ghost" @click="goConsole">打开控制台</button>
           <button type="button" class="iam-sys__ghost" @click="emit('close')">稍后</button>
         </footer>
       </div>
     </div>
+    <IamChangePasswordModal
+      v-model:open="openPwd"
+      @success="onPwdSuccess"
+      @close="openPwd = false" />
   </Teleport>
 </template>
 
 <script setup lang="ts">
 import { fetchPortalSystems, systemsForModules, type PortalSystem } from '~/utils/iam/systems'
 
+const IamChangePasswordModal = defineAsyncComponent(
+  () => import('~/components/iam/ChangePasswordModal.vue'),
+)
+
 const open = defineModel<boolean>('open', { default: false })
 const emit = defineEmits<{ close: [] }>()
 
 const auth = useAuthStore()
 const router = useRouter()
+const openPwd = ref(false)
 
 const remoteSystems = ref<PortalSystem[] | null>(null)
 
@@ -81,6 +91,13 @@ function goConsole() {
   open.value = false
   emit('close')
   router.push('/console')
+}
+
+async function onPwdSuccess() {
+  open.value = false
+  emit('close')
+  await auth.logout()
+  await router.push('/login')
 }
 </script>
 

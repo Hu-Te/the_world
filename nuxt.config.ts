@@ -42,7 +42,9 @@ export default defineNuxtConfig({
         '/console/fieldpulse/alarms',
         '/console/fieldpulse/trends',
         '/console/fieldpulse/scada',
+        '/console/fieldpulse/scada-view',
         '/console/fieldpulse/agents',
+        '/console/fieldpulse/collab',
         '/admin/users',
         '/403',
         '/upgrade',
@@ -99,7 +101,7 @@ export default defineNuxtConfig({
         },
         {
           name: 'description',
-          content: '深空测控：浏览器直达的精密工具测控台。行业分舱选型，校对与核算结果可核。',
+          content: '深空测控：浏览器直达的精密测控台。行业分舱入位，校对与核算结果可溯。',
         },
       ],
       link: [
@@ -121,7 +123,7 @@ export default defineNuxtConfig({
       /** 开发态直连 Java 端口（Nuxt /ws 代理不可靠时的回退） */
       devBackendPort: process.env.NUXT_PUBLIC_DEV_BACKEND_PORT || '8787',
       siteName: process.env.NUXT_PUBLIC_SITE_NAME || '深空测控',
-      siteTagline: process.env.NUXT_PUBLIC_SITE_TAGLINE || '精密工具 · 即开即用',
+      siteTagline: process.env.NUXT_PUBLIC_SITE_TAGLINE || '精密测控 · 即开即用',
       /** 管理员微信二维码（静态资源路径，用于「联系管理员创建账号」） */
       adminWechatQr: process.env.NUXT_PUBLIC_ADMIN_WECHAT_QR || '/iam/wechat-admin-qr.png',
       /** 可选：微信号文案展示 */
@@ -191,9 +193,11 @@ export default defineNuxtConfig({
     port: 3111,
   },
 
-  /** 管理端依赖 Element Plus / 登录态，仅客户端渲染 */
+  /** 管理端依赖 Element Plus / 登录态，仅客户端渲染（含尾斜杠变体） */
   routeRules: {
+    '/admin': { ssr: false },
     '/admin/**': { ssr: false },
+    '/console': { ssr: false },
     '/console/**': { ssr: false },
     '/login': { ssr: false },
     '/403': { ssr: false },
@@ -215,8 +219,10 @@ export default defineNuxtConfig({
     { path: '~/components/fieldpulse', pathPrefix: false },
     { path: '~/components/pack3d', pathPrefix: false },
     { path: '~/components/console', pathPrefix: false },
+    { path: '~/components/sprite', pathPrefix: false },
     /** IAM：登录 / 系统选择；pathPrefix 保留目录名 → IamCornerPortal 等 */
     { path: '~/components/iam', pathPrefix: true },
+
   ],
 
   imports: {

@@ -4,6 +4,7 @@
       <h3>属性</h3>
       <p v-if="node" class="mono">{{ typeLabel }} · {{ shortId }}</p>
       <p v-else class="muted">选中画布图元以编辑</p>
+      <p v-if="selectedCount > 1" class="scada-props__hint">已多选 {{ selectedCount }} 个 · 属性编辑最后选中项</p>
     </header>
 
     <template v-if="node">
@@ -42,7 +43,7 @@
         <span v-if="liveAge != null" class="a">{{ liveAge }}ms</span>
       </div>
       <p v-else-if="needsBind" class="scada-props__hint">
-        点位来自当前登录租户台账；WebSocket 亦按 JWT 租户隔离。
+        点位来自当前登录系统台账；WebSocket 亦按 JWT 系统隔离。
       </p>
       <p v-if="needsBind && !tagOptions.length" class="scada-props__hint warn">
         台账暂无点位，请先配置设备。
@@ -84,6 +85,41 @@
           " />
       </label>
 
+      <template v-if="node.type === 'pipe'">
+        <div class="scada-props__section">管道</div>
+        <label>
+          流动方向
+          <select
+            :value="node.pipeFlowDir || 'forward'"
+            @change="
+              patch({
+                pipeFlowDir:
+                  ($event.target as HTMLSelectElement).value === 'reverse' ? 'reverse' : 'forward',
+              })
+            ">
+            <option value="forward">正向（左 → 右）</option>
+            <option value="reverse">反向（右 → 左）</option>
+          </select>
+        </label>
+        <label>
+          管口边缘
+          <select
+            :value="node.pipeCorner || 'round'"
+            @change="
+              patch({
+                pipeCorner:
+                  ($event.target as HTMLSelectElement).value === 'square' ? 'square' : 'round',
+              })
+            ">
+            <option value="round">圆弧</option>
+            <option value="square">直角</option>
+          </select>
+        </label>
+        <p class="scada-props__hint">
+          绑定点位为真时播放流动动画；可用旋转改变管道朝向。
+        </p>
+      </template>
+
       <label v-if="showAlarm">
         报警阈值（可选）
         <input
@@ -93,6 +129,75 @@
           placeholder="超过则变红"
           @input="onAlarmThreshold" />
       </label>
+
+      <div class="scada-props__section">外观</div>
+      <div class="scada-props__row">
+        <label>
+          字号
+          <input
+            type="number"
+            min="10"
+            max="48"
+            :value="node.style?.fontSize ?? 13"
+            @input="patchStyle({ fontSize: num(($event.target as HTMLInputElement).value, 13) })" />
+        </label>
+        <label>
+          字体
+          <select :value="fontFamilyId" @change="onFontFamily">
+            <option v-for="f in SCADA_FONT_OPTIONS" :key="f.id || 'default'" :value="f.id">
+              {{ f.label }}
+            </option>
+          </select>
+        </label>
+      </div>
+      <div class="scada-props__row">
+        <label>
+          文字色
+          <input
+            type="color"
+            class="scada-props__color"
+            :value="toColorInput(node.style?.color, '#ecfeff')"
+            @input="patchStyle({ color: ($event.target as HTMLInputElement).value })" />
+        </label>
+        <label>
+          背景
+          <input
+            type="color"
+            class="scada-props__color"
+            :value="toColorInput(node.style?.background, '#0f1e2d')"
+            @input="patchStyle({ background: ($event.target as HTMLInputElement).value })" />
+        </label>
+      </div>
+      <div class="scada-props__row">
+        <label>
+          边框色
+          <input
+            type="color"
+            class="scada-props__color"
+            :value="toColorInput(node.style?.borderColor, '#22d3ee')"
+            @input="patchStyle({ borderColor: ($event.target as HTMLInputElement).value })" />
+        </label>
+        <label v-if="showAlarm">
+          报警色
+          <input
+            type="color"
+            class="scada-props__color"
+            :value="toColorInput(node.style?.alarmColor, '#fb7185')"
+            @input="patchStyle({ alarmColor: ($event.target as HTMLInputElement).value })" />
+        </label>
+      </div>
+      <div class="scada-props__presets">
+        <button
+          v-for="p in SCADA_STYLE_PRESETS"
+          :key="p.id"
+          type="button"
+          class="scada-props__chip"
+          :title="p.label"
+          @click="applyPreset(p.id)">
+          {{ p.label }}
+        </button>
+      </div>
+      <p class="scada-props__hint">预设会覆盖当前文字/背景/边框色；「恢复默认」清空自定义外观。</p>
 
       <p v-if="node.type === 'input'" class="scada-props__hint warn">
         设定值写入本用户组态稿（setpoint），不下发 PLC、不进入实时 Map。
@@ -166,8 +271,10 @@
         </button>
       </div>
 
-      <p class="scada-props__hint">选中后拖顶部圆点旋转 · [ / ] 微调 · Shift+[ / ] 转 90°</p>
-      <p class="scada-props__hint">Delete 删除 · ⌘/Ctrl+S 保存</p>
+      <p class="scada-props__hint">选中后拖四角缩放 · 拖顶部圆点旋转 · [ / ] 微调</p>
+      <p class="scada-props__hint">
+        Shift 多选 · ⌘/Ctrl+C 复制 · ⌘/Ctrl+V 粘贴 · Delete 删除 · ⌘/Ctrl+S 保存
+      </p>
 
       <button type="button" class="scada-props__danger" @click="emit('remove', node.id)">
         删除图元
@@ -180,11 +287,17 @@
 import { storeToRefs } from 'pinia'
 import { liveTagKey, useLiveDataStore } from '~/stores/liveData'
 import type { PlcDevice } from '~/utils/console/fieldpulseApi'
-import { SCADA_TYPE_LABELS, type ScadaNodeData } from '~/utils/console/scadaTypes'
+import {
+  SCADA_FONT_OPTIONS,
+  SCADA_STYLE_PRESETS,
+  SCADA_TYPE_LABELS,
+  type ScadaNodeData,
+} from '~/utils/console/scadaTypes'
 
 const props = defineProps<{
   node: ScadaNodeData | null
   devices: PlcDevice[]
+  selectedCount?: number
 }>()
 
 const emit = defineEmits<{
@@ -271,6 +384,15 @@ function patch(partial: Partial<ScadaNodeData>) {
   emit('update', { id: props.node.id, ...partial })
 }
 
+function patchStyle(partial: NonNullable<ScadaNodeData['style']>) {
+  patch({
+    style: {
+      ...(props.node?.style || {}),
+      ...partial,
+    },
+  })
+}
+
 function onBindChange(e: Event) {
   patch({ bindTag: (e.target as HTMLSelectElement).value })
 }
@@ -278,12 +400,52 @@ function onBindChange(e: Event) {
 function onAlarmThreshold(e: Event) {
   const raw = (e.target as HTMLInputElement).value
   const alarmThreshold = raw === '' ? undefined : Number(raw)
-  patch({
-    style: {
-      ...(props.node?.style || {}),
-      alarmThreshold: Number.isFinite(alarmThreshold as number) ? alarmThreshold : undefined,
-    },
+  patchStyle({
+    alarmThreshold: Number.isFinite(alarmThreshold as number) ? alarmThreshold : undefined,
   })
+}
+
+const fontFamilyId = computed(() => {
+  const css = props.node?.style?.fontFamily || ''
+  const hit = SCADA_FONT_OPTIONS.find((f) => f.css === css)
+  return hit?.id ?? ''
+})
+
+function onFontFamily(e: Event) {
+  const id = (e.target as HTMLSelectElement).value
+  const hit = SCADA_FONT_OPTIONS.find((f) => f.id === id)
+  patchStyle({ fontFamily: hit?.css || undefined })
+}
+
+function toColorInput(raw: string | undefined, fallback: string) {
+  if (!raw) return fallback
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(raw.trim())
+  if (m) {
+    if (m[1].length === 3) {
+      return `#${m[1]
+        .split('')
+        .map((c) => c + c)
+        .join('')}`
+    }
+    return raw.trim()
+  }
+  return fallback
+}
+
+function applyPreset(id: string) {
+  const p = SCADA_STYLE_PRESETS.find((x) => x.id === id)
+  if (!p || !props.node) return
+  if (id === 'reset') {
+    const { alarmThreshold, alarmColor } = props.node.style || {}
+    patch({
+      style: {
+        ...(alarmThreshold != null ? { alarmThreshold } : {}),
+        ...(alarmColor ? { alarmColor } : {}),
+      },
+    })
+    return
+  }
+  patchStyle({ ...p.style })
 }
 
 function num(raw: string, fallback: number) {
@@ -343,6 +505,22 @@ function num(raw: string, fallback: number) {
     gap: 0.45rem;
   }
 
+  &__section {
+    margin-top: 0.15rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: #67e8f9;
+    text-transform: uppercase;
+  }
+
+  &__color {
+    height: 1.85rem;
+    padding: 0.1rem !important;
+    cursor: pointer;
+  }
+
+  &__presets,
   &__rot-quick {
     display: flex;
     flex-wrap: wrap;

@@ -33,7 +33,7 @@
       </li>
     </ul>
     <p v-else class="console-shell__empty">当前账号暂无平台子系统，请联系管理员分配套餐。</p>
-  </div>
+</div>
 </template>
 
 <script setup lang="ts">

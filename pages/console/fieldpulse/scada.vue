@@ -1,7 +1,8 @@
 <template>
-  <PlcCenterShell title="组态大屏">
+  <PlcCenterShell title="组态设计">
     <template #actions>
       <span class="ws-pill" :class="'is-' + live.wsStatus">WS {{ live.wsLabel }}</span>
+      <NuxtLink class="plc-btn plc-btn--ghost" to="/console/fieldpulse/scada-view">运行显示</NuxtLink>
       <button type="button" class="plc-btn plc-btn--ghost" @click="reload">刷新台账</button>
     </template>
 
@@ -35,24 +36,38 @@ import ScadaEditor from '~/components/console/fieldpulse/scada/ScadaEditor.vue'
 import { useLiveDataStore } from '~/stores/liveData'
 import { useScadaDocStore } from '~/stores/scadaDoc'
 import { listDevices, type PlcDevice } from '~/utils/console/fieldpulseApi'
+import { purgeLegacyScadaLocalCache } from '~/utils/console/scadaTypes'
 
 defineOptions({ name: 'ConsoleFieldpulseScada' })
 definePageMeta({
   layout: false,
-  /** 切到监控/报警等再回来时保留编辑器实例，避免白屏重挂载 */
   keepalive: true,
 })
 
 const auth = useAuthStore()
 const live = useLiveDataStore()
 const scadaStore = useScadaDocStore()
+const route = useRoute()
 const devices = ref<PlcDevice[]>([])
 const error = ref('')
 const saveTip = ref('')
 const authReady = ref(false)
-const editorRef = ref<{ flushPersist?: () => void; reloadFromCache?: () => void } | null>(null)
-/** 本页是否已 retain，避免 hydrate 触发 watch 时双重 retain */
+const editorRef = ref<{ saveDoc?: () => void; reloadIfClean?: () => void } | null>(null)
 let retainedHere = false
+let unsubPeer: (() => void) | null = null
+let legacyPurged = false
+
+function applySharedQuery() {
+  const q = route.query.sharedId
+  const id = Array.isArray(q) ? q[0] : q
+  scadaStore.setSharedContext(id || null)
+}
+
+function purgeLegacyOnce() {
+  if (legacyPurged) return
+  legacyPurged = true
+  purgeLegacyScadaLocalCache()
+}
 
 const owner = computed(() => ({
   tenantId: auth.profile?.tenantId ?? 0,
@@ -60,7 +75,13 @@ const owner = computed(() => ({
 }))
 
 const sessionHint = computed(() => {
-  if (!auth.isLoggedIn) return '未登录：禁止保存，避免写入共享缓存'
+  if (!auth.isLoggedIn) return '未登录：禁止保存（组态仅写入数据库）'
+  if (scadaStore.sharedDocumentId != null && !scadaStore.canWriteShared) {
+    return '协同只读组态：可查看，不可保存'
+  }
+  if (scadaStore.sharedDocumentId != null) {
+    return `协同组态 #${scadaStore.sharedDocumentId}（可写）`
+  }
   if (!devices.value.length) return '暂无设备台账'
   const active = devices.value.filter((d) => d.sessionActive).length
   if (active === 0) return '尚未启动会话，绑定点位不会有实时值'
@@ -93,18 +114,21 @@ function releaseIfHeld() {
   retainedHere = false
 }
 
-function flushEditor() {
-  editorRef.value?.flushPersist?.()
+function bindPeer() {
+  unsubPeer?.()
+  unsubPeer = scadaStore.subscribePeerReload(
+    { tenantId: owner.value.tenantId, ownerUserId: owner.value.userId },
+    () => nextTick(() => editorRef.value?.reloadIfClean?.()),
+  )
 }
 
-function onPageHide() {
-  // 关标签 / 刷新：keepalive 的 onDeactivated 不一定触发
-  flushEditor()
-}
-
-function onSaved() {
+function onSaved(doc: { nodes?: unknown[] }) {
   error.value = ''
-  saveTip.value = `已保存并缓存（租户 ${owner.value.tenantId} / 用户 ${owner.value.userId}）`
+  const n = doc.nodes?.length ?? 0
+  saveTip.value =
+    n === 0
+      ? '已清空并写入数据库'
+      : `已保存到数据库 · ${n} 个图元（租户 ${owner.value.tenantId} / 用户 ${owner.value.userId}）`
   window.setTimeout(() => {
     saveTip.value = ''
   }, 1800)
@@ -112,7 +136,7 @@ function onSaved() {
 
 function onRestored(count: number) {
   if (count <= 0) return
-  saveTip.value = `已恢复组态缓存 · ${count} 个图元`
+  saveTip.value = `已从数据库加载 · ${count} 个图元`
   window.setTimeout(() => {
     saveTip.value = ''
   }, 2200)
@@ -122,52 +146,67 @@ function onEditorError(message: string) {
   error.value = message
 }
 
+function onFocus() {
+  nextTick(() => editorRef.value?.reloadIfClean?.())
+}
+
 watch(
   () => [auth.profile?.tenantId ?? 0, auth.profile?.userId ?? 0] as const,
   async (cur, prev) => {
     if (!authReady.value) return
     if (!prev) return
     if (cur[0] === prev[0] && cur[1] === prev[1]) return
-    // 切账号：先落盘旧稿，再清内存，避免串租户
-    flushEditor()
     scadaStore.clearMemory()
     releaseIfHeld()
     live.resetForUserSwitch()
     retainOnce()
+    bindPeer()
     await reload()
   },
 )
 
 onMounted(async () => {
+  purgeLegacyOnce()
+  applySharedQuery()
   await auth.hydrate()
   authReady.value = true
   retainOnce()
   await reload()
-  window.addEventListener('pagehide', onPageHide)
-  window.addEventListener('beforeunload', onPageHide)
+  bindPeer()
+  window.addEventListener('focus', onFocus)
 })
 
 onActivated(async () => {
+  applySharedQuery()
   if (!authReady.value) {
     await auth.hydrate()
     authReady.value = true
   }
   retainOnce()
   if (!devices.value.length) await reload()
-  // 切回大屏：合并磁盘，修复「空稿误显 / 空 flush 后以为丢了」
-  nextTick(() => editorRef.value?.reloadFromCache?.())
+  bindPeer()
+  nextTick(() => editorRef.value?.reloadIfClean?.())
 })
 
+watch(
+  () => route.query.sharedId,
+  () => {
+    applySharedQuery()
+    nextTick(() => editorRef.value?.reloadIfClean?.())
+  },
+)
+
 onDeactivated(() => {
-  flushEditor()
   releaseIfHeld()
+  unsubPeer?.()
+  unsubPeer = null
 })
 
 onBeforeUnmount(() => {
-  flushEditor()
   releaseIfHeld()
-  window.removeEventListener('pagehide', onPageHide)
-  window.removeEventListener('beforeunload', onPageHide)
+  unsubPeer?.()
+  unsubPeer = null
+  window.removeEventListener('focus', onFocus)
 })
 </script>
 
@@ -209,33 +248,12 @@ onBeforeUnmount(() => {
 
 .scada-page__boot {
   margin: 2rem auto;
-  color: #64748b;
+  color: #94a3b8;
   font-size: 0.85rem;
 }
 
 .scada-page__editor {
   flex: 1;
   min-height: 0;
-}
-
-.ws-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.18rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.62rem;
-  font-family: ui-monospace, 'IBM Plex Mono', monospace;
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  color: #94a3b8;
-
-  &.is-open {
-    color: #6ee7b7;
-    border-color: rgba(52, 211, 153, 0.4);
-  }
-  &.is-connecting,
-  &.is-reconnecting {
-    color: #fbbf24;
-    border-color: rgba(251, 191, 36, 0.35);
-  }
 }
 </style>

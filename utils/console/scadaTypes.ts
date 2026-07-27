@@ -1,4 +1,4 @@
-/** 组态画布 JSON Schema（按租户+用户隔离持久化） */
+/** 组态画布 JSON Schema（持久化仅在服务端 fp_scada_document） */
 
 export type ScadaNodeType =
   | 'text'
@@ -43,8 +43,14 @@ export type ScadaNodeData = {
    * 输入框本地设定值（仅写入当前用户组态稿，不下发 PLC、不进 liveDataMap）
    */
   setpoint?: string
+  /** 管道流动方向（绑定点位为真时动画）；相对图元局部 X 轴 */
+  pipeFlowDir?: 'forward' | 'reverse'
+  /** 管道端头：圆弧 / 直角 */
+  pipeCorner?: 'round' | 'square'
   style?: {
     fontSize?: number
+    /** CSS font-family，空则用默认 */
+    fontFamily?: string
     color?: string
     alarmColor?: string
     alarmThreshold?: number
@@ -53,27 +59,121 @@ export type ScadaNodeData = {
   }
 }
 
+/** 属性面板可选字体 */
+export const SCADA_FONT_OPTIONS: { id: string; label: string; css: string }[] = [
+  { id: '', label: '默认', css: '' },
+  {
+    id: 'sans',
+    label: '无衬线',
+    css: '"IBM Plex Sans SC", "PingFang SC", "Noto Sans SC", sans-serif',
+  },
+  {
+    id: 'mono',
+    label: '等宽',
+    css: 'ui-monospace, "IBM Plex Mono", "SF Mono", Menlo, monospace',
+  },
+  {
+    id: 'display',
+    label: '显示体',
+    css: '"DIN Alternate", "Helvetica Neue", "Arial Narrow", sans-serif',
+  },
+]
+
+/** 系统外观预设（一点写入 style） */
+export const SCADA_STYLE_PRESETS: {
+  id: string
+  label: string
+  style: NonNullable<ScadaNodeData['style']>
+}[] = [
+  {
+    id: 'cyan',
+    label: '工业青',
+    style: { color: '#ecfeff', background: 'rgba(8,28,40,0.92)', borderColor: 'rgba(34,211,238,0.45)' },
+  },
+  {
+    id: 'amber',
+    label: '琥珀告警',
+    style: { color: '#fef3c7', background: 'rgba(45,28,8,0.92)', borderColor: 'rgba(251,191,36,0.55)' },
+  },
+  {
+    id: 'emerald',
+    label: '运行绿',
+    style: { color: '#d1fae5', background: 'rgba(6,32,24,0.92)', borderColor: 'rgba(52,211,153,0.5)' },
+  },
+  {
+    id: 'slate',
+    label: '暗底白字',
+    style: { color: '#f1f5f9', background: 'rgba(15,23,42,0.95)', borderColor: 'rgba(148,163,184,0.4)' },
+  },
+  {
+    id: 'rose',
+    label: '故障红',
+    style: { color: '#ffe4e6', background: 'rgba(40,10,18,0.94)', borderColor: 'rgba(251,113,133,0.55)' },
+  },
+  {
+    id: 'violet',
+    label: '信号紫',
+    style: { color: '#ede9fe', background: 'rgba(24,16,40,0.94)', borderColor: 'rgba(167,139,250,0.5)' },
+  },
+  {
+    id: 'clear',
+    label: '透明文字',
+    style: { color: '#e2e8f0', background: 'transparent', borderColor: 'transparent' },
+  },
+  {
+    id: 'reset',
+    label: '恢复默认',
+    style: {},
+  },
+]
+
+/**
+ * 归属 ID：后端 Long 经 Jackson ToStringSerializer 以字符串下发。
+ * 禁止用 Number() 比较/作键——雪花 ID 会丢精度，且 string !== number 会导致解析失败。
+ */
+export type ScadaOwnerId = string | number
+
+export type ScadaOwnerRef = {
+  tenantId: ScadaOwnerId
+  ownerUserId: ScadaOwnerId
+}
+
 export type ScadaDocument = {
   version: 2
   name: string
   width: number
   height: number
   nodes: ScadaNodeData[]
+  /** 服务端生成的 ISO 时间 */
   updatedAt: string
-  /** 归属：防止串用他人本机缓存 */
-  tenantId: number
-  ownerUserId: number
+  /** 乐观锁，与库表 revision 对齐 */
+  revision: number
+  tenantId: ScadaOwnerId
+  ownerUserId: ScadaOwnerId
 }
 
-const LEGACY_STORAGE_KEY = 'fieldpulse.scada.doc.v1'
+export function normalizeScadaOwnerId(id: ScadaOwnerId | null | undefined): string {
+  if (id == null) return ''
+  return String(id).trim()
+}
 
-export function scadaStorageKey(tenantId: number, userId: number) {
-  return `fieldpulse.scada.doc.v2.t${tenantId}.u${userId}`
+/** 有效登录归属（排除 0 / 空） */
+export function isValidScadaOwner(owner: ScadaOwnerRef): boolean {
+  const t = normalizeScadaOwnerId(owner.tenantId)
+  const u = normalizeScadaOwnerId(owner.ownerUserId)
+  return Boolean(t && u && t !== '0' && u !== '0')
+}
+
+export function sameScadaOwner(a: ScadaOwnerRef, b: ScadaOwnerRef): boolean {
+  return (
+    normalizeScadaOwnerId(a.tenantId) === normalizeScadaOwnerId(b.tenantId) &&
+    normalizeScadaOwnerId(a.ownerUserId) === normalizeScadaOwnerId(b.ownerUserId)
+  )
 }
 
 export function createEmptyScadaDoc(
   name = '未命名画面',
-  owner?: { tenantId: number; ownerUserId: number },
+  owner?: ScadaOwnerRef,
 ): ScadaDocument {
   return {
     version: 2,
@@ -81,9 +181,28 @@ export function createEmptyScadaDoc(
     width: 1280,
     height: 720,
     nodes: [],
-    updatedAt: new Date().toISOString(),
-    tenantId: owner?.tenantId ?? 0,
-    ownerUserId: owner?.ownerUserId ?? 0,
+    updatedAt: '',
+    revision: 0,
+    tenantId: owner ? normalizeScadaOwnerId(owner.tenantId) || '0' : '0',
+    ownerUserId: owner ? normalizeScadaOwnerId(owner.ownerUserId) || '0' : '0',
+  }
+}
+
+/** 清理历史 localStorage 组态键（一次性；数据库已是唯一真相） */
+export function purgeLegacyScadaLocalCache() {
+  if (!import.meta.client) return
+  try {
+    const drop: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (!k) continue
+      if (k === 'fieldpulse.scada.doc.v1' || k.startsWith('fieldpulse.scada.doc.v2.')) {
+        drop.push(k)
+      }
+    }
+    for (const k of drop) localStorage.removeItem(k)
+  } catch {
+    /* ignore */
   }
 }
 
@@ -127,7 +246,7 @@ export function createScadaNode(
     curve: { w: 220, h: 100, text: '趋势', historySize: 60, decimals: 1 },
     lamp: { w: 64, h: 56, text: '运行' },
     pump: { w: 72, h: 72, text: '泵' },
-    pipe: { w: 160, h: 14, text: '' },
+    pipe: { w: 160, h: 14, text: '', pipeFlowDir: 'forward', pipeCorner: 'round' },
     panel: { w: 200, h: 120, text: '区域' },
   }
   const d = defaults[t as Exclude<ScadaNodeType, 'value' | 'rect'>] || defaults.display
@@ -145,6 +264,8 @@ export function createScadaNode(
     decimals: d.decimals,
     historySize: d.historySize,
     setpoint: '',
+    pipeFlowDir: d.pipeFlowDir ?? 'forward',
+    pipeCorner: d.pipeCorner ?? 'round',
     style: {},
     ...partial,
     // 放在 spread 后，避免 partial 覆盖节点类型
@@ -180,126 +301,39 @@ export function normalizeNode(n: Partial<ScadaNodeData> & { id?: string }): Scad
     decimals: n.decimals ?? base.decimals,
     historySize: n.historySize ?? base.historySize,
     setpoint: n.setpoint ?? '',
-    style: n.style || {},
+    pipeFlowDir: n.pipeFlowDir === 'reverse' ? 'reverse' : 'forward',
+    pipeCorner: n.pipeCorner === 'square' ? 'square' : 'round',
+    style: {
+      ...(n.style || {}),
+      fontSize:
+        n.style?.fontSize != null && Number.isFinite(Number(n.style.fontSize))
+          ? Math.min(48, Math.max(10, Number(n.style.fontSize)))
+          : n.style?.fontSize,
+      fontFamily: n.style?.fontFamily || undefined,
+    },
   }
 }
 
-export function parseOwnedDocument(
-  raw: string,
-  owner: { tenantId: number; ownerUserId: number },
+/** 解析导入 JSON 并改挂到当前用户（不落浏览器缓存） */
+export function parseImportDocument(
+  raw: string | Partial<ScadaDocument>,
+  owner: ScadaOwnerRef,
 ): ScadaDocument | null {
   try {
-    const parsed = JSON.parse(raw) as Partial<ScadaDocument>
+    const parsed = (typeof raw === 'string' ? JSON.parse(raw) : raw) as Partial<ScadaDocument>
     if (!parsed?.nodes || !Array.isArray(parsed.nodes)) return null
-    // 已带归属则必须匹配，防止串读
-    if (
-      parsed.tenantId != null &&
-      parsed.ownerUserId != null &&
-      (Number(parsed.tenantId) !== owner.tenantId ||
-        Number(parsed.ownerUserId) !== owner.ownerUserId)
-    ) {
-      return null
-    }
     return {
       ...createEmptyScadaDoc(parsed.name || '产线概览', owner),
-      ...parsed,
-      version: 2,
-      tenantId: owner.tenantId,
-      ownerUserId: owner.ownerUserId,
+      name: parsed.name || '产线概览',
+      width: Number(parsed.width) > 0 ? Number(parsed.width) : 1280,
+      height: Number(parsed.height) > 0 ? Number(parsed.height) : 720,
       nodes: parsed.nodes.map((n) => normalizeNode(n as ScadaNodeData)),
+      revision: 0,
+      updatedAt: '',
     }
   } catch {
     return null
   }
-}
-
-/** 在内存稿与磁盘稿之间选更完整/更新的一份，避免空稿盖住有效缓存 */
-export function pickRicherScadaDoc(a: ScadaDocument, b: ScadaDocument): ScadaDocument {
-  const an = a.nodes?.length ?? 0
-  const bn = b.nodes?.length ?? 0
-  if (an === 0 && bn > 0) return b
-  if (bn === 0 && an > 0) return a
-  const at = a.updatedAt || ''
-  const bt = b.updatedAt || ''
-  return at >= bt ? a : b
-}
-
-/** 只读窥探磁盘（不迁 legacy），供防覆盖判断 */
-export function peekScadaDocumentFromDisk(owner: {
-  tenantId: number
-  ownerUserId: number
-}): ScadaDocument | null {
-  if (!import.meta.client) return null
-  if (owner.tenantId <= 0 || owner.ownerUserId <= 0) return null
-  const raw = localStorage.getItem(scadaStorageKey(owner.tenantId, owner.ownerUserId))
-  if (!raw) return null
-  return parseOwnedDocument(raw, owner)
-}
-
-/** 加载当前用户画面；仅当用户键为空时，才把无主 legacy 稿迁入一次。 */
-export function loadScadaDocument(owner: {
-  tenantId: number
-  ownerUserId: number
-}): ScadaDocument {
-  if (!import.meta.client) return createEmptyScadaDoc('产线概览', owner)
-  const key = scadaStorageKey(owner.tenantId, owner.ownerUserId)
-  const mine = localStorage.getItem(key)
-  if (mine) {
-    const parsed = parseOwnedDocument(mine, owner)
-    if (parsed) return parsed
-    // 解析失败不覆盖磁盘，避免脏写；返回空稿供编辑器使用
-    console.warn('[scada] localStorage 解析失败，键=', key)
-    return createEmptyScadaDoc('产线概览', owner)
-  }
-  const legacy = localStorage.getItem(LEGACY_STORAGE_KEY)
-  if (legacy) {
-    const migrated = parseOwnedDocument(legacy, owner)
-    if (migrated) {
-      migrated.tenantId = owner.tenantId
-      migrated.ownerUserId = owner.ownerUserId
-      localStorage.setItem(key, JSON.stringify(migrated))
-      // 迁入后移除无主稿，避免同浏览器下一账号再复制同一份画面
-      localStorage.removeItem(LEGACY_STORAGE_KEY)
-      return migrated
-    }
-  }
-  return createEmptyScadaDoc('产线概览', owner)
-}
-
-export type SaveScadaOptions = {
-  /** 允许用空 nodes 覆盖磁盘上的非空稿（显式清空） */
-  allowEmptyOverwrite?: boolean
-}
-
-export function saveScadaDocument(
-  doc: ScadaDocument,
-  owner: { tenantId: number; ownerUserId: number },
-  opts?: SaveScadaOptions,
-) {
-  if (!import.meta.client) return
-  if (owner.tenantId <= 0 || owner.ownerUserId <= 0) {
-    throw new Error('未登录用户不能保存组态（避免污染共享缓存）')
-  }
-  const key = scadaStorageKey(owner.tenantId, owner.ownerUserId)
-  const incomingNodes = Array.isArray(doc.nodes) ? doc.nodes.length : 0
-  // 关键：空稿 flush/误保存不得覆盖已有组态
-  if (!opts?.allowEmptyOverwrite && incomingNodes === 0) {
-    const existing = peekScadaDocumentFromDisk(owner)
-    if (existing && existing.nodes.length > 0) {
-      console.warn('[scada] 拒绝用空稿覆盖磁盘非空组态，键=', key)
-      return null
-    }
-  }
-  const stamped: ScadaDocument = {
-    ...doc,
-    version: 2,
-    tenantId: owner.tenantId,
-    ownerUserId: owner.ownerUserId,
-    updatedAt: new Date().toISOString(),
-    nodes: Array.isArray(doc.nodes) ? doc.nodes : [],
-  }
-  localStorage.setItem(key, JSON.stringify(stamped))
-  return stamped
 }
 
 export const SCADA_TYPE_LABELS: Record<string, string> = {

@@ -1,22 +1,6 @@
 <template>
   <div class="admin-users" :class="{ 'admin-users--ready': ready }">
-    <header class="admin-users__head admin-users__anim" style="--d: 0ms">
-      <div class="admin-users__intro">
-        <p class="admin-users__eyebrow">
-          <span class="admin-users__live" aria-hidden="true" />
-          管理后台 · 用户
-        </p>
-        <h1 class="admin-users__title">用户与额度</h1>
-        <p class="admin-users__lead">
-          仅平台超管可建号。每个用户独立租户；额度按使用天数，到期后无法登录管控系统。
-        </p>
-      </div>
-      <div class="admin-users__actions">
-        <button type="button" class="admin-btn admin-btn--primary" @click="showCreate = true">
-          创建用户
-        </button>
-      </div>
-    </header>
+    <AdminUsersHead @create="showCreate = true" />
 
     <div class="admin-users__meta">
       <div class="admin-chip admin-users__anim" style="--d: 80ms">
@@ -50,78 +34,94 @@
         </button>
       </div>
 
-      <el-table
-        v-loading="loading"
-        :data="rows"
-        class="admin-users__table"
-        empty-text="暂无用户"
-        :row-class-name="rowClassName"
-        :header-cell-style="headerCellStyle"
-        :cell-style="cellStyle">
-        <el-table-column label="账号" min-width="168">
-          <template #default="{ row }">
-            <div class="admin-user">
-              <strong>{{ row.username }}</strong>
-              <em>{{ dash(row.displayName) }}</em>
-              <code v-if="!row.platformAdmin" class="admin-mono" :title="String(row.id)">
-                {{ shortId(row.id) }}
-              </code>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="套餐 / 额度" min-width="168">
-          <template #default="{ row }">
-            <div class="admin-quota">
-              <span class="admin-plan" :class="{ 'admin-plan--plat': row.platformAdmin }">
-                {{ row.platformAdmin ? 'PLATFORM' : dash(row.planCode) }}
-              </span>
-              <span class="admin-quota__exp" :class="expiryClass(row)">
-                {{ expiryLabel(row) }}
-              </span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="服务" min-width="220">
-          <template #default="{ row }">
-            <div v-if="row.platformAdmin" class="admin-tags">
-              <span class="admin-tag admin-tag--plat">全站</span>
-            </div>
-            <div v-else class="admin-tags">
+      <!-- ClientOnly：避免 generate/SSR 时 el-table slot scope 为 undefined 炸页 -->
+      <ClientOnly>
+        <el-table
+          v-loading="loading"
+          :data="rows"
+          class="admin-users__table"
+          empty-text="暂无用户"
+          :row-class-name="rowClassName"
+          :header-cell-style="headerCellStyle"
+          :cell-style="cellStyle">
+          <el-table-column label="账号" min-width="168">
+            <template #default="scope">
+              <div v-if="scope?.row" class="admin-user">
+                <strong>{{ scope.row.username }}</strong>
+                <em>{{ dash(scope.row.displayName) }}</em>
+                <code v-if="!scope.row.platformAdmin" class="admin-mono" :title="String(scope.row.id)">
+                  {{ shortId(scope.row.id) }}
+                </code>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="套餐 / 额度" min-width="168">
+            <template #default="scope">
+              <div v-if="scope?.row" class="admin-quota">
+                <span class="admin-plan" :class="{ 'admin-plan--plat': scope.row.platformAdmin }">
+                  {{ scope.row.platformAdmin ? 'PLATFORM' : dash(scope.row.planCode) }}
+                </span>
+                <span class="admin-quota__exp" :class="expiryClass(scope.row)">
+                  {{ expiryLabel(scope.row) }}
+                </span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="服务" min-width="220">
+            <template #default="scope">
+              <template v-if="scope?.row">
+                <div v-if="scope.row.platformAdmin" class="admin-tags">
+                  <span class="admin-tag admin-tag--plat">全站</span>
+                </div>
+                <div v-else class="admin-tags">
+                  <span
+                    v-for="m in displayModules(scope.row.modules)"
+                    :key="m.code"
+                    class="admin-tag"
+                    :class="{ 'admin-tag--wip': m.wip }"
+                    :title="m.title">
+                    {{ m.short }}
+                  </span>
+                  <span v-if="!displayModules(scope.row.modules).length" class="admin-muted">未分配</span>
+                </div>
+              </template>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="88">
+            <template #default="scope">
               <span
-                v-for="m in displayModules(row.modules)"
-                :key="m.code"
-                class="admin-tag"
-                :class="{ 'admin-tag--wip': m.wip }"
-                :title="m.title">
-                {{ m.short }}
+                v-if="scope?.row"
+                class="admin-status"
+                :class="scope.row.status === 1 ? 'admin-status--on' : 'admin-status--off'">
+                {{ scope.row.status === 1 ? '启用' : '停用' }}
               </span>
-              <span v-if="!displayModules(row.modules).length" class="admin-muted">未分配</span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="88">
-          <template #default="{ row }">
-            <span
-              class="admin-status"
-              :class="row.status === 1 ? 'admin-status--on' : 'admin-status--off'">
-              {{ row.status === 1 ? '启用' : '停用' }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="132" fixed="right" align="right">
-          <template #default="{ row }">
-            <span v-if="row.platformAdmin" class="admin-lock" title="唯一 · 不可操作 · 无需续期">
-              锁定
-            </span>
-            <div v-else class="admin-ops">
-              <button type="button" class="admin-link" @click="openQuota(row)">续期</button>
-              <button type="button" class="admin-link" @click="toggleStatus(row)">
-                {{ row.status === 1 ? '停用' : '启用' }}
-              </button>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="220" fixed="right" align="right">
+            <template #default="scope">
+              <template v-if="scope?.row">
+                <span
+                  v-if="scope.row.platformAdmin"
+                  class="admin-lock"
+                  title="唯一 · 不可续期/停用">
+                  锁定
+                </span>
+                <div v-else class="admin-ops">
+                  <button type="button" class="admin-link" @click="openQuota(scope.row)">续期</button>
+                  <button type="button" class="admin-link" @click="toggleStatus(scope.row)">
+                    {{ scope.row.status === 1 ? '停用' : '启用' }}
+                  </button>
+                  <button type="button" class="admin-link" @click="openResetPwd(scope.row)">重置</button>
+                  <button type="button" class="admin-link" @click="forceLogout(scope.row)">下线</button>
+                </div>
+              </template>
+            </template>
+          </el-table-column>
+        </el-table>
+        <template #fallback>
+          <p class="admin-muted" style="padding: 1.25rem 0">表格加载中…</p>
+        </template>
+      </ClientOnly>
 
       <div class="admin-users__pager">
         <el-pagination
@@ -309,11 +309,64 @@
         </div>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="showResetPwd"
+        class="admin-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-reset-title"
+        @click.self="showResetPwd = false">
+        <div class="admin-modal__panel">
+          <div class="admin-modal__glow" aria-hidden="true" />
+          <header class="admin-modal__head">
+            <p class="admin-modal__eyebrow">ACCOUNT · 重置</p>
+            <h2 id="admin-reset-title" class="admin-modal__title">重置密码</h2>
+            <p class="admin-modal__lead">
+              用户
+              <strong>{{ resetTarget?.username }}</strong>
+              · 至少 8 位 · 将强制下线
+            </p>
+            <button
+              type="button"
+              class="admin-modal__x"
+              aria-label="关闭"
+              @click="showResetPwd = false">
+              ✕
+            </button>
+          </header>
+          <form class="admin-modal__form" @submit.prevent="submitResetPwd">
+            <label class="admin-modal__field">
+              <span>
+                新密码
+                <i>*</i>
+              </span>
+              <input
+                v-model="resetPassword"
+                type="password"
+                autocomplete="new-password"
+                placeholder="至少 8 位"
+                minlength="8" />
+            </label>
+            <div class="admin-modal__actions">
+              <button type="button" class="admin-btn admin-btn--ghost" @click="showResetPwd = false">
+                取消
+              </button>
+              <button type="submit" class="admin-btn admin-btn--primary" :disabled="saving">
+                {{ saving ? '重置中…' : '确认重置' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
+import AdminUsersHead from '~/components/admin/AdminUsersHead.vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 definePageMeta({ layout: 'tool', ssr: false })
 
@@ -359,6 +412,9 @@ const page1 = ref(1)
 const size = 20
 const showCreate = ref(false)
 const showPlan = ref(false)
+const showResetPwd = ref(false)
+const resetTarget = ref<UserRow | null>(null)
+const resetPassword = ref('')
 const planCode = ref('FREE')
 const quotaDays = ref<number | null>(null)
 const quotaModules = ref<string[]>(['FIELDPULSE'])
@@ -407,7 +463,8 @@ function isSelf(row: UserRow): boolean {
   return Number(row.id) === Number(auth.profile?.userId)
 }
 
-function rowClassName({ rowIndex }: { rowIndex: number }) {
+function rowClassName(args?: { rowIndex?: number } | null) {
+  const rowIndex = args?.rowIndex ?? 0
   return `admin-row admin-row--${Math.min(rowIndex, 8)}`
 }
 
@@ -491,9 +548,11 @@ function openQuota(row: UserRow) {
 async function createUser() {
   saving.value = true
   try {
+    const { encryptPasswordForTransport } = await import('~/utils/iam/passwordCrypto')
+    const passwordCipher = await encryptPasswordForTransport(form.password)
     const body: Record<string, unknown> = {
       username: form.username,
-      password: form.password,
+      password: passwordCipher,
       displayName: form.displayName,
       email: form.email,
       phone: form.phone,
@@ -571,6 +630,64 @@ async function toggleStatus(row: UserRow) {
     await auth.adminFetch(`/api/admin/users/${row.id}/status?status=${next}`, { method: 'PUT' })
     ElMessage.success('已更新')
     await load()
+  } catch (e) {
+    if (e instanceof Error && e.name === 'SessionExpiredError') return
+    ElMessage.error(e instanceof Error ? e.message : '操作失败')
+  }
+}
+
+function openResetPwd(row: UserRow) {
+  if (row.platformAdmin) {
+    ElMessage.warning('平台超管请使用自助改密')
+    return
+  }
+  resetTarget.value = row
+  resetPassword.value = ''
+  showResetPwd.value = true
+}
+
+async function submitResetPwd() {
+  if (!resetTarget.value) return
+  if (!resetPassword.value || resetPassword.value.length < 8) {
+    ElMessage.warning('新密码至少 8 位')
+    return
+  }
+  saving.value = true
+  try {
+    const { encryptPasswordForTransport } = await import('~/utils/iam/passwordCrypto')
+    const newPasswordCipher = await encryptPasswordForTransport(resetPassword.value)
+    await auth.adminFetch(`/api/admin/users/${resetTarget.value.id}/password`, {
+      method: 'PUT',
+      body: JSON.stringify({ newPassword: newPasswordCipher }),
+    })
+    ElMessage.success('密码已重置，该账号已强制下线')
+    showResetPwd.value = false
+    resetPassword.value = ''
+  } catch (e) {
+    if (e instanceof Error && e.name === 'SessionExpiredError') return
+    ElMessage.error(e instanceof Error ? e.message : '重置失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function forceLogout(row: UserRow) {
+  if (row.platformAdmin) {
+    ElMessage.warning('平台超管不可强制下线')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确认强制下线账号「${row.username}」？其当前设备需重新登录。`,
+      '强制下线',
+      { type: 'warning', confirmButtonText: '下线', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  try {
+    await auth.adminFetch(`/api/admin/users/${row.id}/force-logout`, { method: 'POST' })
+    ElMessage.success('已强制下线')
   } catch (e) {
     if (e instanceof Error && e.name === 'SessionExpiredError') return
     ElMessage.error(e instanceof Error ? e.message : '操作失败')
@@ -926,7 +1043,9 @@ async function toggleStatus(row: UserRow) {
 
 .admin-ops {
   display: inline-flex;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem 0.65rem;
 }
 
 .admin-lock {

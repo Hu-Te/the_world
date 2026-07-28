@@ -18,7 +18,9 @@
           @click="router.push('/admin/users')">
           账号治理
         </button>
-        <button type="button" class="console-shell__ghost" @click="router.push('/')">返回首页</button>
+        <button type="button" class="console-shell__ghost" @click="router.push('/')">
+          返回首页
+        </button>
       </div>
     </header>
 
@@ -33,7 +35,7 @@
       </li>
     </ul>
     <p v-else class="console-shell__empty">当前账号暂无平台子系统，请联系管理员分配套餐。</p>
-</div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -65,7 +67,8 @@ onMounted(async () => {
 .console-shell {
   min-height: 100vh;
   padding: 2.5rem 1.5rem 3rem;
-  background: radial-gradient(ellipse at 20% 0%, rgba(110, 200, 232, 0.08), transparent 45%), #030812;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(110, 200, 232, 0.08), transparent 45%), #030812;
   color: #e2e8f0;
 }
 

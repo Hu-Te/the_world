@@ -2,11 +2,37 @@
   <PlcCenterShell title="组态设计">
     <template #actions>
       <span class="ws-pill" :class="'is-' + live.wsStatus">WS {{ live.wsLabel }}</span>
-      <NuxtLink class="plc-btn plc-btn--ghost" to="/console/fieldpulse/scada-view">运行显示</NuxtLink>
+      <NuxtLink
+        class="plc-btn plc-btn--ghost"
+        :to="
+          scadaStore.sharedDocumentId != null
+            ? `/console/fieldpulse/scada-view?sharedId=${scadaStore.sharedDocumentId}`
+            : '/console/fieldpulse/scada-view'
+        ">
+        运行显示
+      </NuxtLink>
+      <button
+        type="button"
+        class="plc-btn"
+        :disabled="sessionBusy || !canStartSessions"
+        @click="startBoundSessions">
+        {{ sessionBusy ? '处理中…' : '启动关联会话' }}
+      </button>
+      <button
+        type="button"
+        class="plc-btn plc-btn--ghost"
+        :disabled="sessionBusy || activeSessionCount === 0"
+        @click="stopBoundSessions">
+        停止会话
+      </button>
       <button type="button" class="plc-btn plc-btn--ghost" @click="reload">刷新台账</button>
     </template>
 
     <div class="scada-page">
+      <div v-if="collabBanner" class="scada-page__collab">
+        {{ collabBanner }}
+        <NuxtLink class="scada-page__collab-link" to="/console/fieldpulse/collab">返回工作协同</NuxtLink>
+      </div>
       <div v-if="statusLine" class="scada-page__status">
         <span v-if="sessionHint" class="scada-page__warn">{{ sessionHint }}</span>
         <span v-if="error || live.lastError" class="scada-page__err">{{
@@ -35,7 +61,7 @@ import PlcCenterShell from '~/components/console/fieldpulse/PlcCenterShell.vue'
 import ScadaEditor from '~/components/console/fieldpulse/scada/ScadaEditor.vue'
 import { useLiveDataStore } from '~/stores/liveData'
 import { useScadaDocStore } from '~/stores/scadaDoc'
-import { listDevices, type PlcDevice } from '~/utils/console/fieldpulseApi'
+import { listDevices, startDeviceSession, stopDeviceSession, type PlcDevice } from '~/utils/console/fieldpulseApi'
 import { purgeLegacyScadaLocalCache } from '~/utils/console/scadaTypes'
 
 defineOptions({ name: 'ConsoleFieldpulseScada' })
@@ -52,6 +78,7 @@ const devices = ref<PlcDevice[]>([])
 const error = ref('')
 const saveTip = ref('')
 const authReady = ref(false)
+const sessionBusy = ref(false)
 const editorRef = ref<{ saveDoc?: () => void; reloadIfClean?: () => void } | null>(null)
 let retainedHere = false
 let unsubPeer: (() => void) | null = null
@@ -74,18 +101,84 @@ const owner = computed(() => ({
   userId: auth.profile?.userId ?? 0,
 }))
 
+/** 本系统或协同 WRITE 可启停 */
+function canControlDevice(d: PlcDevice) {
+  if (d.shared && d.sharedPermission !== 'WRITE') return false
+  return true
+}
+
+const controllableDevices = computed(() => devices.value.filter(canControlDevice))
+const activeSessionCount = computed(
+  () => controllableDevices.value.filter((d) => d.sessionActive).length,
+)
+const canStartSessions = computed(() =>
+  controllableDevices.value.some((d) => d.enabled && !d.sessionActive),
+)
+
 const sessionHint = computed(() => {
   if (!auth.isLoggedIn) return '未登录：禁止保存（组态仅写入数据库）'
   if (scadaStore.sharedDocumentId != null && !scadaStore.canWriteShared) {
-    return '协同只读组态：可查看，不可保存'
+    return '协同只读组态：可查看画面与绑定点位，不可保存；会话须由属主或 WRITE 成员启动'
   }
   if (scadaStore.sharedDocumentId != null) {
-    return `协同组态 #${scadaStore.sharedDocumentId}（可写）`
+    return `协同可写组态 #${scadaStore.sharedDocumentId}：保存将写回属主系统`
   }
-  if (!devices.value.length) return '暂无设备台账'
-  const active = devices.value.filter((d) => d.sessionActive).length
-  if (active === 0) return '尚未启动会话，绑定点位不会有实时值'
-  return ''
+  if (!devices.value.length) {
+    return '暂无设备台账。协同成员请从「工作协同」打开已挂载组态，并确保属主已挂载设备且已启动会话'
+  }
+  if (activeSessionCount.value === 0) {
+    return '尚未启动会话，绑定点位不会有实时值 — 可点「启动关联会话」'
+  }
+  return `已启动 ${activeSessionCount.value} 台设备会话`
+})
+
+async function startBoundSessions() {
+  sessionBusy.value = true
+  error.value = ''
+  try {
+    const targets = controllableDevices.value.filter((d) => d.enabled && !d.sessionActive)
+    if (!targets.length) {
+      error.value = '没有可启动的设备（需启用且有写权限）'
+      return
+    }
+    const errors: string[] = []
+    for (const d of targets) {
+      try {
+        await startDeviceSession(d.id)
+      } catch (e) {
+        errors.push(`${d.name}: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    }
+    await reload()
+    if (errors.length) error.value = errors.join('；')
+    else saveTip.value = `已启动 ${targets.length} 台会话`
+  } finally {
+    sessionBusy.value = false
+  }
+}
+
+async function stopBoundSessions() {
+  sessionBusy.value = true
+  error.value = ''
+  try {
+    const targets = controllableDevices.value.filter((d) => d.sessionActive)
+    for (const d of targets) {
+      try {
+        await stopDeviceSession(d.id)
+      } catch (e) {
+        error.value = e instanceof Error ? e.message : String(e)
+      }
+    }
+    await reload()
+  } finally {
+    sessionBusy.value = false
+  }
+}
+const collabBanner = computed(() => {
+  if (scadaStore.sharedDocumentId == null) return ''
+  const perm = scadaStore.sharedPermission === 'WRITE' ? '可写' : '只读'
+  const name = scadaStore.doc?.name || '组态画面'
+  return `协同挂载组态「${name}」· ${perm} · 文档 #${scadaStore.sharedDocumentId}`
 })
 
 const statusLine = computed(
@@ -232,6 +325,27 @@ onBeforeUnmount(() => {
   width: 100%;
   text-align: center;
   font-size: 0.7rem;
+}
+
+.scada-page__collab {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(110, 196, 184, 0.35);
+  background: rgba(14, 116, 144, 0.2);
+  color: #a5f3fc;
+  font-size: 0.78rem;
+}
+
+.scada-page__collab-link {
+  color: #ecfeff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .scada-page__warn {

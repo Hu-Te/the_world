@@ -1,5 +1,6 @@
 <template>
   <div class="scada-runtime">
+    <p v-if="writeMsg" class="scada-runtime__write" :class="{ err: writeErr }">{{ writeMsg }}</p>
     <div ref="viewportEl" class="scada-runtime__viewport">
       <div
         class="scada-runtime__stage"
@@ -12,9 +13,11 @@
             :node-data="n"
             :selected="false"
             :interactive="false"
+            :runtime-write="true"
             :canvas-w="doc.width"
             :canvas-h="doc.height"
-            :view-scale="viewScale" />
+            :view-scale="viewScale"
+            @write="onWrite" />
           <p v-if="!doc.nodes.length" class="scada-runtime__empty">暂无组态图元，请先在设计页添加</p>
         </div>
       </div>
@@ -24,6 +27,7 @@
 
 <script setup lang="ts">
 import ScadaNode from '~/components/console/fieldpulse/scada/ScadaNode.vue'
+import { listDevices, writeDeviceTag, type PlcDevice } from '~/utils/console/fieldpulseApi'
 import type { ScadaDocument } from '~/utils/console/scadaTypes'
 
 const props = defineProps<{
@@ -33,6 +37,10 @@ const props = defineProps<{
 const viewportEl = ref<HTMLElement | null>(null)
 const viewScale = ref(1)
 const VIEW_PAD = 8
+const devices = ref<PlcDevice[]>([])
+const writeMsg = ref('')
+const writeErr = ref(false)
+let writeBusy = false
 
 const stageW = computed(() => Math.max(1, Math.round(props.doc.width * viewScale.value)))
 const stageH = computed(() => Math.max(1, Math.round(props.doc.height * viewScale.value)))
@@ -52,10 +60,50 @@ function measureFit() {
   viewScale.value = Math.max(0.12, Math.min(s, 3))
 }
 
+function resolveDeviceId(bindTag: string): string | null {
+  const sep = bindTag.indexOf('::')
+  const runtimeId = sep > 0 ? bindTag.slice(0, sep) : ''
+  if (!runtimeId) return null
+  const d = devices.value.find((x) => x.runtimeDeviceId === runtimeId)
+  return d?.id != null ? String(d.id) : null
+}
+
+async function onWrite(payload: { bindTag: string; value: unknown }) {
+  if (writeBusy) return
+  const deviceId = resolveDeviceId(payload.bindTag)
+  if (!deviceId) {
+    writeErr.value = true
+    writeMsg.value = '无法解析绑定设备，请确认台账 runtimeDeviceId 与会话'
+    return
+  }
+  const sep = payload.bindTag.indexOf('::')
+  const tagKey = sep > 0 ? payload.bindTag.slice(sep + 2) : payload.bindTag
+  writeBusy = true
+  writeErr.value = false
+  writeMsg.value = '下发中…'
+  try {
+    await writeDeviceTag(deviceId, tagKey, payload.value)
+    writeMsg.value = `已下发 ${tagKey}=${String(payload.value)}`
+    window.setTimeout(() => {
+      writeMsg.value = ''
+    }, 2000)
+  } catch (e) {
+    writeErr.value = true
+    writeMsg.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    writeBusy = false
+  }
+}
+
 let resizeObserver: ResizeObserver | null = null
 
-onMounted(() => {
+onMounted(async () => {
   measureFit()
+  try {
+    devices.value = await listDevices()
+  } catch {
+    /* ignore */
+  }
   if (viewportEl.value && typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(() => measureFit())
     resizeObserver.observe(viewportEl.value)
@@ -80,52 +128,57 @@ onBeforeUnmount(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  gap: 0.25rem;
+}
+
+.scada-runtime__write {
+  flex-shrink: 0;
+  margin: 0;
+  text-align: center;
+  font-size: 0.72rem;
+  color: #6ee7b7;
+
+  &.err {
+    color: #fca5a5;
+  }
 }
 
 .scada-runtime__viewport {
   flex: 1;
   min-height: 0;
+  overflow: auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  background: radial-gradient(120% 80% at 50% 0%, #0a1620 0%, #020617 70%);
 }
 
 .scada-runtime__stage {
   position: relative;
-  flex-shrink: 0;
 }
 
 .scada-runtime__board {
   position: relative;
   transform-origin: 0 0;
-  background: #070f18;
-  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.12);
-  overflow: hidden;
+  background: #0b1220;
+  border: 1px solid rgba(148, 163, 184, 0.25);
 }
 
 .scada-runtime__grid {
   position: absolute;
   inset: 0;
+  background-image: linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 20px 20px;
   pointer-events: none;
-  opacity: 0.22;
-  background-image:
-    linear-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
-  background-size: 40px 40px;
 }
 
 .scada-runtime__empty {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   margin: 0;
-  color: #64748b;
-  font-size: 0.9rem;
-  pointer-events: none;
+  color: #94a3b8;
+  font-size: 0.85rem;
 }
 </style>

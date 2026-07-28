@@ -204,14 +204,26 @@
             </td>
             <td class="ops">
               <button
-                v-if="!d.shared || d.sharedPermission === 'WRITE'"
+                v-if="canMutateDevice(d)"
                 type="button"
                 class="link"
                 @click="openEdit(d)">
                 编辑
               </button>
-              <button type="button" class="link" @click="start(d.id)">启动</button>
-              <button type="button" class="link" @click="stop(d.id)">停止</button>
+              <button
+                v-if="canMutateDevice(d)"
+                type="button"
+                class="link"
+                @click="start(d.id)">
+                启动
+              </button>
+              <button
+                v-if="canMutateDevice(d)"
+                type="button"
+                class="link"
+                @click="stop(d.id)">
+                停止
+              </button>
               <button
                 v-if="!d.shared"
                 type="button"
@@ -219,6 +231,9 @@
                 @click="remove(d.id)">
                 删除
               </button>
+              <span v-if="d.shared && d.sharedPermission !== 'WRITE'" class="idle" title="协同只读：不可编辑/启停">
+                只读
+              </span>
             </td>
           </tr>
           <tr v-if="!devices.length">
@@ -399,6 +414,12 @@ function onTagDragEnd() {
 
 function agentOnline(agentId: string) {
   return agents.value.some((a) => a.agentId === agentId)
+}
+
+/** 本系统设备或协同 WRITE 可编辑/启停；共享 READ 仅可查看 */
+function canMutateDevice(d: PlcDevice) {
+  if (!d.shared) return true
+  return d.sharedPermission === 'WRITE'
 }
 
 function resetForm() {

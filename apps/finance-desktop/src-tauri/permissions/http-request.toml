@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-http-request"
+description = "允许桌面壳代理访问云端 IAM 与本机 Sidecar HTTP"
+commands.allow = ["http_request"]

@@ -19,7 +19,7 @@ const router = useRouter()
 
 const MODULE_META: Record<string, { code: string; name: string; redirect?: string }> = {
   fieldpulse: { code: 'FIELDPULSE', name: 'PLC 数据管控中心', redirect: '/console/fieldpulse' },
-  finance: { code: 'FINANCE', name: '财务审计' },
+  finance: { code: 'FINANCE', name: '财务审计', redirect: '/console/finance' },
   pack3d: { code: 'PACK3D', name: '包装设计' },
 }
 

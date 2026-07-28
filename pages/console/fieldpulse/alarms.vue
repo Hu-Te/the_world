@@ -58,6 +58,15 @@
           阈值
           <input v-model.number="ruleForm.threshold" type="number" step="any" required />
         </label>
+        <label>
+          死区
+          <input
+            v-model.number="ruleForm.deadband"
+            type="number"
+            min="0"
+            step="any"
+            title="滞回：已报警时需越过阈值±死区才恢复，抑制临界抖动" />
+        </label>
       </template>
 
       <label>
@@ -321,6 +330,7 @@ const ruleForm = reactive({
   ruleName: '',
   comparator: 'GT',
   threshold: 80,
+  deadband: 0,
   boolValue: 'true' as 'true' | 'false',
   triggerMode: 'LEVEL' as 'RISING' | 'LEVEL' | 'FALLING',
   cycleSec: 2,
@@ -448,7 +458,8 @@ function formatRuleCond(r: AlarmRule) {
     r.triggerMode === 'RISING' ? '上升沿' : r.triggerMode === 'FALLING' ? '下降沿' : '持续'
   const cycleSec =
     r.cycleMs != null && r.cycleMs > 0 ? `${(r.cycleMs / 1000).toFixed(r.cycleMs % 1000 ? 1 : 0)}s` : '2s'
-  return `${cond} · ${modeShort} · ${cycleSec}`
+  const db = r.deadband != null && r.deadband > 0 ? ` · 死区${r.deadband}` : ''
+  return `${cond} · ${modeShort} · ${cycleSec}${db}`
 }
 
 function cycleMsFromForm() {
@@ -518,6 +529,7 @@ async function saveRule() {
       return
     }
     const cycleMs = cycleMsFromForm()
+    const deadband = Math.max(0, Number(ruleForm.deadband) || 0)
     const body = isBoolTag.value
       ? {
           deviceId: ruleForm.deviceId,
@@ -527,6 +539,7 @@ async function saveRule() {
           threshold: ruleForm.boolValue === 'true' ? 1 : 0,
           triggerMode: ruleForm.triggerMode,
           cycleMs,
+          deadband: 0,
           enabled: true,
         }
       : {
@@ -537,6 +550,7 @@ async function saveRule() {
           threshold: ruleForm.threshold,
           triggerMode: ruleForm.triggerMode,
           cycleMs,
+          deadband,
           enabled: true,
         }
     await createAlarmRule(body)

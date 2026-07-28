@@ -27,7 +27,7 @@
       </span>
     </template>
 
-    <!-- 输入框：本地设定显示，不写他户数据；PLC 下发需后续写点 API -->
+    <!-- 输入框：设计页写组态稿；运行页可下发 PLC -->
     <template v-else-if="nodeData.type === 'input'">
       <span class="scada-node__caption">{{ nodeData.text || '设定' }}</span>
       <div class="scada-node__input-row" @mousedown.stop>
@@ -35,11 +35,13 @@
           class="scada-node__input mono"
           :value="inputDraft"
           :placeholder="displayText"
-          :readonly="!interactive"
+          :readonly="!interactive && !runtimeWrite"
           @input="onInputDraft"
           @change="commitSetpoint"
           @blur="commitSetpoint"
-          @focus="interactive && emit('select', { id: nodeData.id, additive: false })" />
+          @focus="
+            (interactive || runtimeWrite) && emit('select', { id: nodeData.id, additive: false })
+          " />
         <span v-if="nodeData.unit" class="scada-node__unit">{{ nodeData.unit }}</span>
       </div>
       <span class="scada-node__pv mono">PV {{ displayText }}</span>
@@ -155,10 +157,12 @@ const props = withDefaults(
     canvasH: number
     /** 画布视口缩放，拖拽位移需除以该值 */
     viewScale?: number
-    /** false = 运行态只读（不可拖拽/缩放/旋转/改设定） */
+    /** false = 运行态只读（不可拖拽/缩放/旋转） */
     interactive?: boolean
+    /** 运行态允许写点（按钮/输入） */
+    runtimeWrite?: boolean
   }>(),
-  { interactive: true },
+  { interactive: true, runtimeWrite: false },
 )
 
 type ResizeCorner = 'nw' | 'ne' | 'sw' | 'se'
@@ -168,6 +172,7 @@ const emit = defineEmits<{
   select: [payload: { id: string; additive: boolean }]
   move: [payload: { id: string; x: number; y: number }]
   patch: [payload: Partial<ScadaNodeData> & { id: string }]
+  write: [payload: { bindTag: string; value: unknown }]
 }>()
 
 const live = useLiveDataStore()
@@ -267,6 +272,12 @@ function onInputDraft(e: Event) {
 
 function commitSetpoint() {
   const next = inputDraft.value
+  if (props.runtimeWrite) {
+    const tag = props.nodeData.bindTag
+    if (!tag) return
+    emit('write', { bindTag: tag, value: next })
+    return
+  }
   if (next === (props.nodeData.setpoint || '')) return
   emit('patch', { id: props.nodeData.id, setpoint: next })
 }
@@ -274,6 +285,11 @@ function commitSetpoint() {
 function onButtonClick() {
   // 刚拖过则忽略 click，避免拖完误触「启动」
   if (movedDuringDrag) return
+  if (props.runtimeWrite) {
+    const tag = props.nodeData.bindTag
+    if (tag) emit('write', { bindTag: tag, value: true })
+    return
+  }
   emit('select', { id: props.nodeData.id, additive: false })
 }
 

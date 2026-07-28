@@ -34,104 +34,119 @@
         </button>
       </div>
 
-      <!-- ClientOnly：避免 generate/SSR 时 el-table slot scope 为 undefined 炸页 -->
+      <!-- 等 Element Plus 注册完再挂表，避免生产分包竞态导致空白清单 -->
       <ClientOnly>
-        <el-table
-          v-loading="loading"
-          :data="rows"
-          class="admin-users__table"
-          empty-text="暂无用户"
-          :row-class-name="rowClassName"
-          :header-cell-style="headerCellStyle"
-          :cell-style="cellStyle">
-          <el-table-column label="账号" min-width="168">
-            <template #default="scope">
-              <div v-if="scope?.row" class="admin-user">
-                <strong>{{ scope.row.username }}</strong>
-                <em>{{ dash(scope.row.displayName) }}</em>
-                <code v-if="!scope.row.platformAdmin" class="admin-mono" :title="String(scope.row.id)">
-                  {{ shortId(scope.row.id) }}
-                </code>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="套餐 / 额度" min-width="168">
-            <template #default="scope">
-              <div v-if="scope?.row" class="admin-quota">
-                <span class="admin-plan" :class="{ 'admin-plan--plat': scope.row.platformAdmin }">
-                  {{ scope.row.platformAdmin ? 'PLATFORM' : dash(scope.row.planCode) }}
-                </span>
-                <span class="admin-quota__exp" :class="expiryClass(scope.row)">
-                  {{ expiryLabel(scope.row) }}
-                </span>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="服务" min-width="220">
-            <template #default="scope">
-              <template v-if="scope?.row">
-                <div v-if="scope.row.platformAdmin" class="admin-tags">
-                  <span class="admin-tag admin-tag--plat">全站</span>
+        <div v-if="!epReady" class="admin-users__ssr-fallback">
+          <p class="admin-muted" style="padding: 1.25rem 0; display: inline">
+            {{ epError || '表格组件加载中…' }}
+          </p>
+          <button
+            v-if="epError"
+            type="button"
+            class="admin-users__refresh"
+            style="margin-left: 12px"
+            @click="retryEp">
+            重试
+          </button>
+        </div>
+        <template v-else>
+          <el-table
+            v-loading="loading"
+            :data="rows"
+            class="admin-users__table"
+            empty-text="暂无用户"
+            :row-class-name="rowClassName"
+            :header-cell-style="headerCellStyle"
+            :cell-style="cellStyle">
+            <el-table-column label="账号" min-width="168">
+              <template #default="scope">
+                <div v-if="scope?.row" class="admin-user">
+                  <strong>{{ scope.row.username }}</strong>
+                  <em>{{ dash(scope.row.displayName) }}</em>
+                  <code v-if="!scope.row.platformAdmin" class="admin-mono" :title="String(scope.row.id)">
+                    {{ shortId(scope.row.id) }}
+                  </code>
                 </div>
-                <div v-else class="admin-tags">
-                  <span
-                    v-for="m in displayModules(scope.row.modules)"
-                    :key="m.code"
-                    class="admin-tag"
-                    :class="{ 'admin-tag--wip': m.wip }"
-                    :title="m.title">
-                    {{ m.short }}
+              </template>
+            </el-table-column>
+            <el-table-column label="套餐 / 额度" min-width="168">
+              <template #default="scope">
+                <div v-if="scope?.row" class="admin-quota">
+                  <span class="admin-plan" :class="{ 'admin-plan--plat': scope.row.platformAdmin }">
+                    {{ scope.row.platformAdmin ? 'PLATFORM' : dash(scope.row.planCode) }}
                   </span>
-                  <span v-if="!displayModules(scope.row.modules).length" class="admin-muted">未分配</span>
+                  <span class="admin-quota__exp" :class="expiryClass(scope.row)">
+                    {{ expiryLabel(scope.row) }}
+                  </span>
                 </div>
               </template>
-            </template>
-          </el-table-column>
-          <el-table-column label="状态" width="88">
-            <template #default="scope">
-              <span
-                v-if="scope?.row"
-                class="admin-status"
-                :class="scope.row.status === 1 ? 'admin-status--on' : 'admin-status--off'">
-                {{ scope.row.status === 1 ? '启用' : '停用' }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="220" fixed="right" align="right">
-            <template #default="scope">
-              <template v-if="scope?.row">
+            </el-table-column>
+            <el-table-column label="服务" min-width="220">
+              <template #default="scope">
+                <template v-if="scope?.row">
+                  <div v-if="scope.row.platformAdmin" class="admin-tags">
+                    <span class="admin-tag admin-tag--plat">全站</span>
+                  </div>
+                  <div v-else class="admin-tags">
+                    <span
+                      v-for="m in displayModules(scope.row.modules)"
+                      :key="m.code"
+                      class="admin-tag"
+                      :class="{ 'admin-tag--wip': m.wip }"
+                      :title="m.title">
+                      {{ m.short }}
+                    </span>
+                    <span v-if="!displayModules(scope.row.modules).length" class="admin-muted">未分配</span>
+                  </div>
+                </template>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="88">
+              <template #default="scope">
                 <span
-                  v-if="scope.row.platformAdmin"
-                  class="admin-lock"
-                  title="唯一 · 不可续期/停用">
-                  锁定
+                  v-if="scope?.row"
+                  class="admin-status"
+                  :class="scope.row.status === 1 ? 'admin-status--on' : 'admin-status--off'">
+                  {{ scope.row.status === 1 ? '启用' : '停用' }}
                 </span>
-                <div v-else class="admin-ops">
-                  <button type="button" class="admin-link" @click="openQuota(scope.row)">续期</button>
-                  <button type="button" class="admin-link" @click="toggleStatus(scope.row)">
-                    {{ scope.row.status === 1 ? '停用' : '启用' }}
-                  </button>
-                  <button type="button" class="admin-link" @click="openResetPwd(scope.row)">重置</button>
-                  <button type="button" class="admin-link" @click="forceLogout(scope.row)">下线</button>
-                </div>
               </template>
-            </template>
-          </el-table-column>
-        </el-table>
+            </el-table-column>
+            <el-table-column label="操作" width="220" fixed="right" align="right">
+              <template #default="scope">
+                <template v-if="scope?.row">
+                  <span
+                    v-if="scope.row.platformAdmin"
+                    class="admin-lock"
+                    title="唯一 · 不可续期/停用">
+                    锁定
+                  </span>
+                  <div v-else class="admin-ops">
+                    <button type="button" class="admin-link" @click="openQuota(scope.row)">续期</button>
+                    <button type="button" class="admin-link" @click="toggleStatus(scope.row)">
+                      {{ scope.row.status === 1 ? '停用' : '启用' }}
+                    </button>
+                    <button type="button" class="admin-link" @click="openResetPwd(scope.row)">重置</button>
+                    <button type="button" class="admin-link" @click="forceLogout(scope.row)">下线</button>
+                  </div>
+                </template>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <div class="admin-users__pager">
+            <el-pagination
+              v-model:current-page="page1"
+              background
+              layout="total, prev, pager, next"
+              :page-size="size"
+              :total="total"
+              @current-change="load" />
+          </div>
+        </template>
         <template #fallback>
           <p class="admin-muted" style="padding: 1.25rem 0">表格加载中…</p>
         </template>
       </ClientOnly>
-
-      <div class="admin-users__pager">
-        <el-pagination
-          v-model:current-page="page1"
-          background
-          layout="total, prev, pager, next"
-          :page-size="size"
-          :total="total"
-          @current-change="load" />
-      </div>
     </section>
 
     <Teleport to="body">
@@ -361,12 +376,57 @@
         </div>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="showForceLogout"
+        class="admin-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-logout-title"
+        @click.self="closeForceLogout">
+        <div class="admin-modal__panel admin-modal__panel--confirm">
+          <div class="admin-modal__glow" aria-hidden="true" />
+          <header class="admin-modal__head">
+            <p class="admin-modal__eyebrow">ACCOUNT · 会话</p>
+            <h2 id="admin-logout-title" class="admin-modal__title">强制下线</h2>
+            <p class="admin-modal__lead">
+              确认强制下线账号
+              <strong>{{ forceLogoutTarget?.username }}</strong>
+              ？其当前设备需重新登录。
+            </p>
+            <button
+              type="button"
+              class="admin-modal__x"
+              aria-label="关闭"
+              @click="closeForceLogout">
+              ✕
+            </button>
+          </header>
+          <div class="admin-modal__form">
+            <p class="admin-modal__warn">不会删除账号或改密，仅吊销现有登录会话。</p>
+            <div class="admin-modal__actions">
+              <button type="button" class="admin-btn admin-btn--ghost" :disabled="saving" @click="closeForceLogout">
+                取消
+              </button>
+              <button
+                type="button"
+                class="admin-btn admin-btn--danger"
+                :disabled="saving"
+                @click="submitForceLogout">
+                {{ saving ? '处理中…' : '确认下线' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
 import AdminUsersHead from '~/components/admin/AdminUsersHead.vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 
 definePageMeta({ layout: 'tool', ssr: false })
 
@@ -390,19 +450,21 @@ type UserRow = {
 
 const SERVICE_OPTIONS = [
   { code: 'FIELDPULSE', short: '01', name: 'PLC 管控', title: 'PLC 数据管控中心', wip: false },
-  { code: 'FINANCE', short: '03', name: '财务审计', title: '财务审计', wip: true },
+  { code: 'FINANCE', short: '03', name: '财务审计', title: '财务审计桌面（框架）', wip: true },
   { code: 'PACK3D', short: '05', name: '包装设计', title: '软包装 3D', wip: true },
 ] as const
 
 const MODULE_META: Record<string, { short: string; title: string; wip: boolean }> = {
   FIELDPULSE: { short: '01 PLC', title: 'PLC 数据管控中心', wip: false },
-  FINANCE: { short: '03 财务', title: '财务审计（暂未开发）', wip: true },
+  FINANCE: { short: '03 财务', title: '财务审计桌面（框架·本机隔离）', wip: true },
   PACK3D: { short: '05 包装', title: '包装设计（暂未开发）', wip: true },
   ACCOUNT: { short: 'SYS', title: '账号中心', wip: false },
 }
 
 const auth = useAuthStore()
 const ready = ref(false)
+const epReady = ref(false)
+const epError = ref('')
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -413,7 +475,9 @@ const size = 20
 const showCreate = ref(false)
 const showPlan = ref(false)
 const showResetPwd = ref(false)
+const showForceLogout = ref(false)
 const resetTarget = ref<UserRow | null>(null)
+const forceLogoutTarget = ref<UserRow | null>(null)
 const resetPassword = ref('')
 const planCode = ref('FREE')
 const quotaDays = ref<number | null>(null)
@@ -468,11 +532,36 @@ function rowClassName(args?: { rowIndex?: number } | null) {
   return `admin-row admin-row--${Math.min(rowIndex, 8)}`
 }
 
+async function ensureEp(): Promise<void> {
+  epError.value = ''
+  const ensure = useNuxtApp().$ensureAdminElementPlus as (() => Promise<void>) | undefined
+  if (!ensure) {
+    throw new Error('表格组件未注入，请刷新重试')
+  }
+  await ensure()
+  epReady.value = true
+}
+
+async function retryEp() {
+  try {
+    await ensureEp()
+  } catch (e) {
+    epReady.value = false
+    epError.value = e instanceof Error ? e.message : '表格组件加载失败，请刷新重试'
+  }
+}
+
 onMounted(async () => {
   auth.hydrate()
   requestAnimationFrame(() => {
     ready.value = true
   })
+  try {
+    await ensureEp()
+  } catch (e) {
+    epReady.value = false
+    epError.value = e instanceof Error ? e.message : '表格组件加载失败，请刷新重试'
+  }
   await load()
 })
 
@@ -676,21 +765,30 @@ async function forceLogout(row: UserRow) {
     ElMessage.warning('平台超管不可强制下线')
     return
   }
-  try {
-    await ElMessageBox.confirm(
-      `确认强制下线账号「${row.username}」？其当前设备需重新登录。`,
-      '强制下线',
-      { type: 'warning', confirmButtonText: '下线', cancelButtonText: '取消' },
-    )
-  } catch {
-    return
-  }
+  forceLogoutTarget.value = row
+  showForceLogout.value = true
+}
+
+function closeForceLogout() {
+  if (saving.value) return
+  showForceLogout.value = false
+  forceLogoutTarget.value = null
+}
+
+async function submitForceLogout() {
+  const row = forceLogoutTarget.value
+  if (!row) return
+  saving.value = true
   try {
     await auth.adminFetch(`/api/admin/users/${row.id}/force-logout`, { method: 'POST' })
     ElMessage.success('已强制下线')
+    showForceLogout.value = false
+    forceLogoutTarget.value = null
   } catch (e) {
     if (e instanceof Error && e.name === 'SessionExpiredError') return
     ElMessage.error(e instanceof Error ? e.message : '操作失败')
+  } finally {
+    saving.value = false
   }
 }
 </script>
@@ -1116,6 +1214,13 @@ async function forceLogout(row: UserRow) {
   }
 }
 
+.admin-users__ssr-fallback {
+  display: flex;
+  align-items: center;
+  min-height: 12rem;
+  padding: 0 1.1rem;
+}
+
 .admin-users__pager {
   display: flex;
   justify-content: flex-end;
@@ -1178,6 +1283,19 @@ async function forceLogout(row: UserRow) {
     }
   }
 
+  &--danger {
+    border-color: rgba(251, 113, 133, 0.45);
+    background: linear-gradient(180deg, rgba(251, 113, 133, 0.28), rgba(225, 29, 72, 0.14));
+    color: #ffe4e6;
+    box-shadow: 0 0 22px rgba(244, 63, 94, 0.16);
+
+    &:hover:not(:disabled) {
+      border-color: rgba(251, 113, 133, 0.7);
+      background: linear-gradient(180deg, rgba(251, 113, 133, 0.38), rgba(225, 29, 72, 0.2));
+      box-shadow: 0 0 30px rgba(244, 63, 94, 0.24);
+    }
+  }
+
   &:disabled {
     cursor: not-allowed;
     opacity: 0.5;
@@ -1191,7 +1309,7 @@ async function forceLogout(row: UserRow) {
 .admin-modal {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 200;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1222,6 +1340,15 @@ async function forceLogout(row: UserRow) {
 
   &--wide {
     max-width: 34rem;
+  }
+
+  &--confirm {
+    max-width: 24rem;
+    border-color: rgba(251, 113, 133, 0.28);
+    box-shadow:
+      0 28px 72px rgba(0, 0, 0, 0.55),
+      0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+      0 0 48px rgba(244, 63, 94, 0.08);
   }
 }
 
@@ -1262,6 +1389,22 @@ async function forceLogout(row: UserRow) {
   font-size: 0.82rem;
   line-height: 1.5;
   color: #94a3b8;
+
+  strong {
+    color: #e2e8f0;
+    font-weight: 600;
+  }
+}
+
+.admin-modal__warn {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  background: rgba(251, 191, 36, 0.08);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #fde68a;
 }
 
 .admin-modal__x {

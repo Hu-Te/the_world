@@ -200,7 +200,7 @@
       <p class="scada-props__hint">预设会覆盖当前文字/背景/边框色；「恢复默认」清空自定义外观。</p>
 
       <p v-if="node.type === 'input'" class="scada-props__hint warn">
-        设定值写入本用户组态稿（setpoint），不下发 PLC、不进入实时 Map。
+        设计页本地设定写入组态稿；运行显示中回车/失焦会下发到已绑定 PLC 点位（须会话已启动）。
       </p>
       <label v-if="node.type === 'input'">
         本地设定
@@ -210,7 +210,7 @@
           @input="patch({ setpoint: ($event.target as HTMLInputElement).value })" />
       </label>
       <p v-if="node.type === 'button'" class="scada-props__hint">
-        按钮亮灭跟随绑定 BOOL/数值；点击不下发（待写点接口）。
+        按钮亮灭跟随绑定 BOOL/数值；运行显示中点击将写 TRUE 到绑定点（须会话已启动）。
       </p>
 
       <div class="scada-props__row">

@@ -1,0 +1,18 @@
+{
+  "name": "finance-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "财务审计桌面 · Tauri 壳（同账号登录，业务数据本机隔离）",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.5.0"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  }
+}

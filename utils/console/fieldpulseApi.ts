@@ -48,6 +48,8 @@ export type AlarmRule = {
   triggerMode?: string
   /** 记次周期（毫秒） */
   cycleMs?: number
+  /** 滞回死区 */
+  deadband?: number
   enabled: boolean
 }
 
@@ -126,6 +128,15 @@ export function stopDeviceSession(id: string) {
   return apiFetch<null>(`${BASE}/devices/${id}/session/stop`, { method: 'POST' })
 }
 
+/** HMI 写点：须会话已启动 */
+export function writeDeviceTag(deviceId: string, tagKey: string, value: unknown) {
+  return apiFetch<null>(`${BASE}/devices/${deviceId}/tags/write`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tagKey, value }),
+  })
+}
+
 export function listAlarmRules(deviceId?: string) {
   const q = deviceId != null ? `?deviceId=${deviceId}` : ''
   return apiFetch<AlarmRule[]>(`${BASE}/alarm-rules${q}`)
@@ -139,6 +150,7 @@ export function createAlarmRule(body: {
   threshold: number
   triggerMode: string
   cycleMs?: number
+  deadband?: number
   enabled: boolean
 }) {
   return apiFetch<AlarmRule>(`${BASE}/alarm-rules`, {
@@ -281,6 +293,7 @@ export type CollabResource = {
   resourceId: number | string
   resourceLabel?: string | null
   permission: string
+  paused?: boolean
   ownerTenantId: number | string
 }
 
@@ -396,4 +409,24 @@ export function revokeCollabResource(spaceId: string | number, resourceRowId: st
   return apiFetch<null>(`${COLLAB}/spaces/${spaceId}/resources/${resourceRowId}`, {
     method: 'DELETE',
   })
+}
+
+export function pauseCollabResource(spaceId: string | number, resourceRowId: string | number) {
+  return apiFetch<CollabResource>(`${COLLAB}/spaces/${spaceId}/resources/${resourceRowId}/pause`, {
+    method: 'POST',
+  })
+}
+
+export function resumeCollabResource(spaceId: string | number, resourceRowId: string | number) {
+  return apiFetch<CollabResource>(`${COLLAB}/spaces/${spaceId}/resources/${resourceRowId}/resume`, {
+    method: 'POST',
+  })
+}
+
+export function pauseAllCollabResources(spaceId: string | number) {
+  return apiFetch<number>(`${COLLAB}/spaces/${spaceId}/resources/pause-all`, { method: 'POST' })
+}
+
+export function resumeAllCollabResources(spaceId: string | number) {
+  return apiFetch<number>(`${COLLAB}/spaces/${spaceId}/resources/resume-all`, { method: 'POST' })
 }

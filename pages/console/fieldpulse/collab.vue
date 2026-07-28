@@ -9,7 +9,7 @@
 
     <div class="collab">
       <p class="collab__lead">
-        邀请同事进入空间，默认同写<strong>协作纪要</strong>。PLC 数据需所有者额外挂载；删除空间或停止设备会话后共享结束。操作疑问请询问右下角「深空精灵」。
+        邀请同事进入空间，默认同写<strong>协作纪要</strong>。PLC 数据需所有者额外挂载；属主可随时<strong>暂停共享</strong>（挂载保留，成员立即断流），删除空间或停止设备会话后共享结束。操作疑问请询问右下角「深空精灵」。
       </p>
 
       <p v-if="error" class="collab__toast collab__toast--err">{{ error }}</p>
@@ -190,7 +190,27 @@
           <section class="collab__block">
             <div class="collab__block-head">
               <h4 class="collab__block-title">共享数据</h4>
-              <span class="collab__dim">可同时挂多台设备 + 组态</span>
+              <div class="collab__block-actions">
+                <span class="collab__dim">可同时挂多台设备 + 组态</span>
+                <template v-if="detail.space.myRole === 'OWNER' && detail.resources.length">
+                  <button
+                    v-if="hasActiveShared"
+                    type="button"
+                    class="plc-btn plc-btn--ghost"
+                    :disabled="pausingAll"
+                    @click="onPauseAll">
+                    {{ pausingAll ? '处理中…' : '暂停全部共享' }}
+                  </button>
+                  <button
+                    v-if="hasPausedShared"
+                    type="button"
+                    class="plc-btn plc-btn--ghost"
+                    :disabled="pausingAll"
+                    @click="onResumeAll">
+                    {{ pausingAll ? '处理中…' : '恢复全部共享' }}
+                  </button>
+                </template>
+              </div>
             </div>
             <form
               v-if="detail.space.myRole === 'OWNER'"
@@ -218,18 +238,32 @@
                   </li>
                 </ul>
                 <p v-else class="collab__dim">
-                  {{ devices.length ? '本系统设备均已挂载' : '暂无设备台账' }}
+                  {{ devices.length ? '本系统设备均已挂载（见下方列表）' : '暂无设备台账' }}
                 </p>
               </div>
 
               <div class="collab__grant-section">
-                <p class="collab__grant-label">组态</p>
-                <label v-if="grantScadaId && !scadaAlreadyMounted" class="collab__check">
+                <p class="collab__grant-label">组态画面</p>
+                <template v-if="mountedScada">
+                  <p class="collab__mount-status">
+                    已挂载：<strong>{{ mountedScada.resourceLabel || '组态画面' }}</strong>
+                    · {{ permLabel(mountedScada.permission) }}
+                    <span v-if="mountedScada.paused" class="collab__tag collab__tag--warn">已暂停</span>
+                  </p>
+                  <NuxtLink
+                    v-if="!mountedScada.paused"
+                    class="plc-btn plc-btn--ghost"
+                    :to="`/console/fieldpulse/scada?sharedId=${mountedScada.resourceId}`">
+                    打开已挂载组态
+                  </NuxtLink>
+                </template>
+                <label v-else-if="grantScadaId" class="collab__check">
                   <input v-model="grantIncludeScada" type="checkbox" />
-                  <span>挂载当前组态画面</span>
+                  <span>挂载「{{ grantScadaName || '当前组态' }}」到本空间</span>
                 </label>
-                <p v-else-if="scadaAlreadyMounted" class="collab__dim">组态已挂载</p>
-                <p v-else class="collab__dim">请先在「组态设计」保存画面后再挂载</p>
+                <p v-else class="collab__dim">
+                  请先在「组态设计」保存画面，再回到此处勾选挂载。成员才能在下方列表打开组态。
+                </p>
               </div>
             </form>
             <ul class="collab__resources">
@@ -238,32 +272,62 @@
                   <p class="collab__resource-name">
                     <span class="collab__tag">{{ resourceTypeLabel(r.resourceType) }}</span>
                     {{ r.resourceLabel || '未命名' }}
+                    <span v-if="r.paused" class="collab__tag collab__tag--warn">已暂停</span>
                   </p>
-                  <p class="collab__dim">{{ permLabel(r.permission) }}</p>
+                  <p class="collab__dim">
+                    {{ permLabel(r.permission) }}
+                    <template v-if="r.resourceType === 'SCADA'">
+                      · 协同挂载 #{{ r.resourceId }}
+                    </template>
+                    <template v-if="r.paused"> · 属主已暂停，成员不可访问</template>
+                  </p>
                 </div>
                 <div class="collab__resource-actions">
                   <NuxtLink
-                    v-if="r.resourceType === 'DEVICE'"
+                    v-if="r.resourceType === 'DEVICE' && !r.paused"
                     class="plc-btn plc-btn--ghost"
                     to="/console/fieldpulse/devices">
                     台账
                   </NuxtLink>
                   <NuxtLink
-                    v-else-if="r.resourceType === 'SCADA'"
+                    v-else-if="r.resourceType === 'SCADA' && !r.paused"
                     class="plc-btn plc-btn--ghost"
                     :to="`/console/fieldpulse/scada?sharedId=${r.resourceId}`">
-                    组态
+                    打开组态
                   </NuxtLink>
-                  <button
-                    v-if="detail.space.myRole === 'OWNER'"
-                    type="button"
-                    class="collab__icon-btn"
-                    @click="onRevokeResource(r.id)">
-                    取消
-                  </button>
+                  <template v-if="detail.space.myRole === 'OWNER'">
+                    <button
+                      v-if="!r.paused"
+                      type="button"
+                      class="plc-btn plc-btn--ghost"
+                      @click="onPauseResource(r.id)">
+                      暂停共享
+                    </button>
+                    <button
+                      v-else
+                      type="button"
+                      class="plc-btn"
+                      @click="onResumeResource(r.id)">
+                      恢复共享
+                    </button>
+                    <button
+                      type="button"
+                      class="collab__icon-btn"
+                      title="永久移除挂载"
+                      @click="onRevokeResource(r.id)">
+                      移除
+                    </button>
+                  </template>
                 </div>
               </li>
-              <li v-if="!detail.resources.length" class="collab__empty">暂无挂载</li>
+              <li v-if="!detail.resources.length" class="collab__empty">
+                <template v-if="detail.space.myRole === 'OWNER'">
+                  尚未挂载。请勾选设备/组态后点「挂载所选」；成员加入后即可在本列表看到。
+                </template>
+                <template v-else>
+                  所有者尚未挂载设备或组态。挂载后会出现在此处，可点「打开组态 / 台账」进入。
+                </template>
+              </li>
             </ul>
           </section>
         </main>
@@ -290,8 +354,12 @@ import {
   listCollabInvites,
   listCollabSpaces,
   listDevices,
+  pauseAllCollabResources,
+  pauseCollabResource,
   putCollabBoard,
   removeCollabMember,
+  resumeAllCollabResources,
+  resumeCollabResource,
   revokeCollabInvite,
   revokeCollabResource,
   type CollabInvite,
@@ -321,8 +389,17 @@ const lastJoinKey = ref('')
 const grantDeviceIds = ref<string[]>([])
 const grantIncludeScada = ref(false)
 const grantScadaId = ref('')
+const grantScadaName = ref('')
 const grantPerm = ref('READ')
 const granting = ref(false)
+const pausingAll = ref(false)
+
+const hasActiveShared = computed(
+  () => (detail.value?.resources || []).some((r) => !r.paused),
+)
+const hasPausedShared = computed(
+  () => (detail.value?.resources || []).some((r) => !!r.paused),
+)
 const savingBoard = ref(false)
 
 const canEditBoard = computed(
@@ -340,11 +417,20 @@ const mountedDeviceIds = computed(() => {
   return set
 })
 
+/** 本空间已挂载的组态（一人一画面，取最新一条即可） */
+const mountedScada = computed(() => {
+  const list = detail.value?.resources || []
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (list[i]?.resourceType === 'SCADA') return list[i]!
+  }
+  return null
+})
+
 const scadaAlreadyMounted = computed(() => {
-  if (!grantScadaId.value || !detail.value) return false
-  return detail.value.resources.some(
-    (r) => r.resourceType === 'SCADA' && String(r.resourceId) === grantScadaId.value,
-  )
+  if (!mountedScada.value) return false
+  // 有挂载即视为已挂；若本地还能拉到 id，则要求一致（防旧挂载僵尸）
+  if (!grantScadaId.value) return true
+  return String(mountedScada.value.resourceId) === grantScadaId.value
 })
 
 const mountableDevices = computed(() =>
@@ -440,14 +526,19 @@ async function openSpace(id: string | number) {
         const scada = await fetchScadaDocument()
         if (scada?.persisted && scada.id != null) {
           grantScadaId.value = String(scada.id)
+          grantScadaName.value = scada.name || '产线概览'
         } else {
           grantScadaId.value = ''
+          grantScadaName.value = ''
         }
       } catch {
         grantScadaId.value = ''
+        grantScadaName.value = ''
       }
     } else {
       invites.value = []
+      grantScadaId.value = ''
+      grantScadaName.value = ''
     }
   } catch (e) {
     detail.value = null
@@ -634,13 +725,69 @@ async function onGrant() {
 
 async function onRevokeResource(rowId: string | number) {
   if (!selectedId.value) return
+  if (!confirm('确认永久移除该挂载？成员将无法再访问；需要共享请重新挂载。')) return
   error.value = ''
   try {
     await revokeCollabResource(selectedId.value, rowId)
     await openSpace(selectedId.value)
-    okMsg.value = '已取消挂载'
+    okMsg.value = '已移除挂载'
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+async function onPauseResource(rowId: string | number) {
+  if (!selectedId.value) return
+  error.value = ''
+  try {
+    await pauseCollabResource(selectedId.value, rowId)
+    await openSpace(selectedId.value)
+    okMsg.value = '已暂停共享'
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+async function onResumeResource(rowId: string | number) {
+  if (!selectedId.value) return
+  error.value = ''
+  try {
+    await resumeCollabResource(selectedId.value, rowId)
+    await openSpace(selectedId.value)
+    okMsg.value = '已恢复共享'
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+async function onPauseAll() {
+  if (!selectedId.value) return
+  if (!confirm('暂停本空间全部共享？成员将立即失去访问与实时数据，挂载仍保留。')) return
+  pausingAll.value = true
+  error.value = ''
+  try {
+    const n = await pauseAllCollabResources(selectedId.value)
+    await openSpace(selectedId.value)
+    okMsg.value = `已暂停 ${n} 项共享`
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    pausingAll.value = false
+  }
+}
+
+async function onResumeAll() {
+  if (!selectedId.value) return
+  pausingAll.value = true
+  error.value = ''
+  try {
+    const n = await resumeAllCollabResources(selectedId.value)
+    await openSpace(selectedId.value)
+    okMsg.value = `已恢复 ${n} 项共享`
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    pausingAll.value = false
   }
 }
 
@@ -993,6 +1140,12 @@ onMounted(async () => {
   gap: 0.35rem;
 }
 
+.collab__mount-status {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #a5f3fc;
+}
+
 .collab__grant-label {
   margin: 0;
   font-size: 0.7rem;
@@ -1096,6 +1249,11 @@ onMounted(async () => {
   color: #a5f3fc;
   background: rgba(34, 211, 238, 0.1);
   border: 1px solid rgba(34, 211, 238, 0.22);
+  &--warn {
+    color: #fde68a;
+    background: rgba(251, 191, 36, 0.1);
+    border-color: rgba(251, 191, 36, 0.35);
+  }
 }
 
 .collab__dim {

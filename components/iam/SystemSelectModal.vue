@@ -23,7 +23,7 @@
 
         <ul v-if="available.length" class="iam-sys__grid" role="list">
           <li v-for="sys in available" :key="sys.moduleCode">
-            <button type="button" class="iam-sys__card" @click="enter(sys.href)">
+            <button type="button" class="iam-sys__card" @click="enter(sys)">
               <span class="iam-sys__code" :style="{ color: sys.accent }">{{ sys.code }}</span>
               <span class="iam-sys__name">{{ sys.name }}</span>
               <span class="iam-sys__desc">{{ sys.desc }}</span>
@@ -81,10 +81,10 @@ watch(
   { immediate: true },
 )
 
-function enter(href: string) {
+function enter(sys: PortalSystem) {
   open.value = false
   emit('close')
-  router.push(href)
+  router.push(sys.href)
 }
 
 function goConsole() {

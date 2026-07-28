@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>财务审计桌面</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="desk" id="appShell">
+      <div class="desk__atmosphere" aria-hidden="true">
+        <div class="desk__orb desk__orb--a"></div>
+        <div class="desk__orb desk__orb--b"></div>
+        <div class="desk__mesh"></div>
+      </div>
+
+      <!-- 登录态 -->
+      <div id="viewLogin" class="view view--login">
+        <main class="stage stage--center">
+          <header class="top top--center">
+            <p class="eyebrow"><span class="eyebrow__dot"></span> HUTE · FINANCE</p>
+            <h1>财务审计桌面</h1>
+            <p class="top__lead">同账号登录 · 数据仅落本机 · 安装即用</p>
+            <div class="hud hud--inline" aria-label="状态">
+              <div class="hud__cell">
+                <span class="hud__k">CLOUD</span>
+                <strong id="cloudStatus" class="hud__v">未登录</strong>
+              </div>
+              <div class="hud__cell">
+                <span class="hud__k">LOCAL</span>
+                <strong id="localStatus" class="hud__v">准备中</strong>
+              </div>
+            </div>
+          </header>
+
+          <section class="panel panel--solo">
+            <header class="panel__head">
+              <div>
+                <p class="panel__kicker">GATE</p>
+                <h2>云端账号</h2>
+              </div>
+              <p class="panel__hint">校验 FINANCE 后自动完成本机就绪</p>
+            </header>
+            <div class="panel__body">
+              <label class="field">
+                <span>API Origin</span>
+                <input id="cloudOrigin" type="url" placeholder="https://hute.top" />
+              </label>
+              <div class="field-row">
+                <label class="field">
+                  <span>用户名</span>
+                  <input id="username" autocomplete="username" placeholder="账号" />
+                </label>
+                <label class="field">
+                  <span>密码</span>
+                  <input
+                    id="password"
+                    type="password"
+                    autocomplete="current-password"
+                    placeholder="••••••••" />
+                </label>
+              </div>
+              <button type="button" id="btnLogin" class="btn btn--fill">登录并进入工作台</button>
+              <p id="loginMsg" class="toast" hidden></p>
+            </div>
+          </section>
+        </main>
+      </div>
+
+      <!-- 工作台：侧栏 + 内容 -->
+      <div id="viewApp" class="view view--app" hidden>
+        <aside class="rail" aria-label="功能菜单">
+          <div class="rail__brand">
+            <div class="mark" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div>
+              <p class="rail__eyebrow">HUTE · FINANCE</p>
+              <p class="rail__name">深空测控</p>
+            </div>
+          </div>
+
+          <nav class="rail__nav" id="sideNav"></nav>
+
+          <div class="rail__meta">
+            <p id="railUser">—</p>
+            <code id="railTenant">tenant —</code>
+            <button type="button" id="btnLogout" class="btn btn--mini rail__logout">退出登录</button>
+          </div>
+        </aside>
+
+        <div class="stage stage--app">
+          <header class="top top--app">
+            <div>
+              <p class="panel__kicker" id="pageKicker">MODULE</p>
+              <h1 id="pageTitle">工作台</h1>
+              <p class="top__lead" id="pageLead">本机核算总览</p>
+            </div>
+            <div class="hud" aria-label="运行状态">
+              <div class="hud__cell">
+                <span class="hud__k">CLOUD</span>
+                <strong id="appCloudStatus" class="hud__v">—</strong>
+              </div>
+              <div class="hud__cell">
+                <span class="hud__k">LOCAL</span>
+                <strong id="appLocalStatus" class="hud__v">—</strong>
+              </div>
+            </div>
+          </header>
+
+          <div id="pageBody" class="page-body"></div>
+
+          <footer class="bottom">
+            <span class="bottom__pulse" aria-hidden="true"></span>
+            <span>LOCAL-FIRST</span>
+            <span class="bottom__sep">/</span>
+            <span>DESKTOP LEDGER</span>
+          </footer>
+        </div>
+      </div>
+    </div>
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>

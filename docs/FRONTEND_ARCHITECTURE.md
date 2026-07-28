@@ -8,8 +8,10 @@
 pages/tools/*           工具舱（匿名）
 pages/console/*         管控台（JWT + 模块）
 pages/admin/*           超管 ACCOUNT
+apps/finance-desktop/   财务桌面壳（不进公网 generate）
 components/<domain>/    域 UI（禁止跨域巨型耦合）
 utils/<domain>/         api / types / 纯函数
+utils/finance-desktop/  桌面分发客户端（禁串工具舱写云）
 stores/                 扁平 Pinia
 middleware/auth.global.ts
 ```
@@ -20,6 +22,7 @@ middleware/auth.global.ts
 |----|------|-----|
 | 工具 | `utils/fieldpulse/api.ts` → `/api/fieldpulse` | `/ws/fieldpulse` |
 | 管控 | `utils/console/fieldpulseApi.ts` → `/api/console/fieldpulse` | `/ws/console/fieldpulse` |
+| 财务桌面分发 | `utils/finance-desktop/distributionApi.ts` → `/api/console/finance/desktop` | — |
 
 禁止 `NUXT_PUBLIC_API_TOKEN`。
 

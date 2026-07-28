@@ -25,7 +25,7 @@ export const PORTAL_SYSTEMS: PortalSystem[] = [
     moduleCode: 'FINANCE',
     code: '03',
     name: '财务审计',
-    desc: '勾稽 · 企税 · 语料 · 账龄（平台侧）',
+    desc: '桌面 App 说明与下载 · 本机数据隔离',
     href: '/console/finance',
     accent: '#6ec4b8',
   },

@@ -2,7 +2,29 @@
   <PlcCenterShell title="运行显示">
     <template #actions>
       <span class="ws-pill" :class="'is-' + live.wsStatus">WS {{ live.wsLabel }}</span>
-      <NuxtLink class="plc-btn plc-btn--ghost" to="/console/fieldpulse/scada">返回设计</NuxtLink>
+      <NuxtLink
+        class="plc-btn plc-btn--ghost"
+        :to="
+          scadaStore.sharedDocumentId != null
+            ? `/console/fieldpulse/scada?sharedId=${scadaStore.sharedDocumentId}`
+            : '/console/fieldpulse/scada'
+        ">
+        返回设计
+      </NuxtLink>
+      <button
+        type="button"
+        class="plc-btn"
+        :disabled="sessionBusy || !canStartSessions"
+        @click="startBoundSessions">
+        {{ sessionBusy ? '处理中…' : '启动关联会话' }}
+      </button>
+      <button
+        type="button"
+        class="plc-btn plc-btn--ghost"
+        :disabled="sessionBusy || activeSessionCount === 0"
+        @click="stopBoundSessions">
+        停止会话
+      </button>
       <button type="button" class="plc-btn plc-btn--ghost" @click="openFullscreen">全屏</button>
     </template>
 
@@ -26,6 +48,12 @@ import ScadaRuntimeBoard from '~/components/console/fieldpulse/scada/ScadaRuntim
 import { useLiveDataStore } from '~/stores/liveData'
 import { useScadaDocStore } from '~/stores/scadaDoc'
 import {
+  listDevices,
+  startDeviceSession,
+  stopDeviceSession,
+  type PlcDevice,
+} from '~/utils/console/fieldpulseApi'
+import {
   createEmptyScadaDoc,
   isValidScadaOwner,
   type ScadaDocument,
@@ -45,6 +73,8 @@ const route = useRoute()
 const authReady = ref(false)
 const error = ref('')
 const docTip = ref('')
+const sessionBusy = ref(false)
+const devices = ref<PlcDevice[]>([])
 const pageEl = ref<HTMLElement | null>(null)
 const doc = ref<ScadaDocument>(createEmptyScadaDoc('产线概览'))
 let retainedHere = false
@@ -63,18 +93,78 @@ const owner = computed(() => ({
 
 const canPersist = computed(() => isValidScadaOwner(owner.value))
 
+function canControlDevice(d: PlcDevice) {
+  if (d.shared && d.sharedPermission !== 'WRITE') return false
+  return true
+}
+
+const controllableDevices = computed(() => devices.value.filter(canControlDevice))
+const activeSessionCount = computed(
+  () => controllableDevices.value.filter((d) => d.sessionActive).length,
+)
+const canStartSessions = computed(() =>
+  controllableDevices.value.some((d) => d.enabled && !d.sessionActive),
+)
+
 const sessionHint = computed(() => {
   if (!auth.isLoggedIn) return '未登录：无法从数据库加载组态'
   if (scadaStore.sharedDocumentId != null) {
     return `协同组态 #${scadaStore.sharedDocumentId}`
   }
   if (!doc.value.nodes.length) return '组态为空：请先在「组态设计」添加图元并保存'
-  return ''
+  if (activeSessionCount.value === 0) {
+    return '尚未启动会话，画面无实时值 — 可点「启动关联会话」'
+  }
+  return `运行中 · 已启动 ${activeSessionCount.value} 台会话`
 })
 
 const statusLine = computed(
   () => Boolean(sessionHint.value || error.value || live.lastError || docTip.value),
 )
+
+async function reloadDevices() {
+  try {
+    devices.value = await listDevices()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+async function startBoundSessions() {
+  sessionBusy.value = true
+  error.value = ''
+  try {
+    const targets = controllableDevices.value.filter((d) => d.enabled && !d.sessionActive)
+    for (const d of targets) {
+      try {
+        await startDeviceSession(d.id)
+      } catch (e) {
+        error.value = e instanceof Error ? e.message : String(e)
+      }
+    }
+    await reloadDevices()
+  } finally {
+    sessionBusy.value = false
+  }
+}
+
+async function stopBoundSessions() {
+  sessionBusy.value = true
+  error.value = ''
+  try {
+    const targets = controllableDevices.value.filter((d) => d.sessionActive)
+    for (const d of targets) {
+      try {
+        await stopDeviceSession(d.id)
+      } catch (e) {
+        error.value = e instanceof Error ? e.message : String(e)
+      }
+    }
+    await reloadDevices()
+  } finally {
+    sessionBusy.value = false
+  }
+}
 
 function retainOnce() {
   if (retainedHere) return
@@ -97,7 +187,7 @@ async function reloadDoc() {
     const loaded = await scadaStore.load(owner.value)
     doc.value = loaded
     if (loaded.nodes.length > 0) {
-      docTip.value = `运行中 · ${loaded.nodes.length} 个图元 · ${loaded.name || '未命名'}`
+      docTip.value = `已加载 · ${loaded.nodes.length} 个图元 · ${loaded.name || '未命名'}`
       window.setTimeout(() => {
         docTip.value = ''
       }, 2000)
@@ -130,6 +220,7 @@ watch(
     if (!authReady.value) return
     bindPeer()
     void reloadDoc()
+    void reloadDevices()
   },
 )
 
@@ -138,7 +229,7 @@ onMounted(async () => {
   await auth.hydrate()
   authReady.value = true
   retainOnce()
-  await reloadDoc()
+  await Promise.all([reloadDoc(), reloadDevices()])
   bindPeer()
   window.addEventListener('focus', reloadDoc)
 })
@@ -151,7 +242,7 @@ onActivated(async () => {
   }
   retainOnce()
   bindPeer()
-  await reloadDoc()
+  await Promise.all([reloadDoc(), reloadDevices()])
 })
 
 watch(

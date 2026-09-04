@@ -114,3 +114,13 @@ export function saveFinanceDesktopBlob(filename: string, bytes: Blob) {
   a.click()
   URL.revokeObjectURL(href)
 }
+
+export type FinanceDesktopOfflineToken = {
+  token: string
+  deepLinkUrl: string
+}
+
+/** 签发财务桌面离线 JWT，并返回 fintools:// Deep Link。 */
+export function issueFinanceOfflineToken() {
+  return apiFetch<FinanceDesktopOfflineToken>(`${BASE}/offline-token`, { method: 'POST' })
+}

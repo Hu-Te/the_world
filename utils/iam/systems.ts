@@ -24,8 +24,8 @@ export const PORTAL_SYSTEMS: PortalSystem[] = [
   {
     moduleCode: 'FINANCE',
     code: '03',
-    name: '财务审计',
-    desc: '桌面 App 说明与下载 · 本机数据隔离',
+    name: '财务离线桌面',
+    desc: '仅离线 App：签发密钥 · 安装包分发（数据不出本机）',
     href: '/console/finance',
     accent: '#6ec4b8',
   },

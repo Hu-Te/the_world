@@ -9,10 +9,10 @@
 
     <main class="fin__main">
       <section class="fin__hero">
-        <p class="fin__eyebrow">FINANCE · Desktop</p>
-        <h1 class="fin__title">财务审计桌面</h1>
+        <p class="fin__eyebrow">FINANCE · Offline only</p>
+        <h1 class="fin__title">财务离线桌面</h1>
         <p class="fin__lead">
-          云端同一账号登录，核算数据只留在你的电脑里。解压即开、登录即用，也不用把账套上云。
+          FINANCE 模块只服务离线 App：云端只做登录与密钥签发，核算数据只留在你的电脑里。
         </p>
       </section>
 
@@ -27,7 +27,7 @@
         </article>
         <article class="fin__pro">
           <h2>同账号、少折腾</h2>
-          <p>沿用 hute.top 账号与 FINANCE 权限；口令传输方式与网站一致，不必另开一套账密。</p>
+          <p>开通 FINANCE 后用同一账号签发离线密钥；不做云端账套，也不另开一套账密。</p>
         </article>
         <article class="fin__pro">
           <h2>安装即用</h2>
@@ -39,12 +39,29 @@
         <article class="fin__pro">
           <h2>边界清晰</h2>
           <p>
-            云端只做登录与安装包分发；正式核算在本机完成，适合对数据驻留有要求的审计与内控场景。
+            FINANCE ≠ 云端财务后台。云端只做密钥与安装包；正式核算只在本机 fin-app。
           </p>
         </article>
       </section>
 
       <p v-if="pageError" class="fin__err">{{ pageError }}</p>
+
+      <section class="fin__auth" aria-label="离线授权">
+        <article class="fin__card fin__card--auth">
+          <h2 class="fin__h2">离线授权</h2>
+          <p class="fin__card-lead">
+            FINANCE 仅用于本机
+            <code>fin-app</code>
+            ：签发离线密钥（
+            <code>fintools://</code>
+            ），有网签一次后可纯离线。
+          </p>
+          <FinDesktopActions v-if="canIssueOffline" />
+          <p v-else class="fin__err">
+            当前账号未开通 FINANCE。请管理员在「账号管理」为该用户解锁 FINANCE 模块后再签发。
+          </p>
+        </article>
+      </section>
 
       <section class="fin__grid">
         <article class="fin__card">
@@ -104,8 +121,9 @@
               <code>.zip</code>
               后双击
               <code>FinanceDesktop.exe</code>
-              ，等待弹出独立应用窗口（非浏览器标签页），用云端账号登录。任务栏「财务审计桌面服务」可最小化，勿关闭。需本机有
-              Edge 或 Chrome。下载若被拦截，选「保留 / 仍要运行」。
+              后打开 Electron
+              <code>fin-app</code>
+              。在本页点「生成密钥并打开桌面端」完成授权；若未唤起可复制 Deep Link。下载若被拦截，选「保留 / 仍要运行」。
             </li>
             <li>
               <strong>macOS</strong>
@@ -137,11 +155,18 @@ import {
   type FinanceDesktopManifest,
   type FinanceDesktopPlatform,
 } from '~/utils/finance-desktop/distributionApi'
+import FinDesktopActions from '~/components/console/finance/FinDesktopActions.vue'
 
 definePageMeta({ layout: false })
 
 const auth = useAuthStore()
 const router = useRouter()
+
+const canIssueOffline = computed(() => {
+  if (auth.isSuperAdmin) return true
+  const mods = auth.profile?.unlockedModules ?? []
+  return mods.map((m) => String(m).toUpperCase()).includes('FINANCE')
+})
 
 const pageError = ref('')
 const manifest = ref<FinanceDesktopManifest | null>(null)
@@ -254,7 +279,7 @@ onMounted(async () => {
   }
   const mods = auth.profile?.unlockedModules ?? []
   if (!auth.isSuperAdmin && !mods.map((m) => m.toUpperCase()).includes('FINANCE')) {
-    pageError.value = '当前套餐未解锁 FINANCE 模块'
+    pageError.value = '当前账号未开通 FINANCE（该模块仅用于离线桌面 App）'
     return
   }
   await loadManifest()
@@ -375,6 +400,15 @@ onMounted(async () => {
     font-size: 0.8em;
     color: #c5e4dc;
   }
+}
+
+.fin__auth {
+  margin-bottom: 1.25rem;
+}
+
+.fin__card--auth {
+  border-color: rgba(159, 216, 204, 0.28);
+  background: linear-gradient(165deg, rgba(46, 160, 140, 0.12), rgba(8, 24, 32, 0.65));
 }
 
 .fin__grid {

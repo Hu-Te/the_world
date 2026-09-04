@@ -36,6 +36,8 @@ export default defineNuxtConfig({
         '/',
         '/login',
         '/console',
+        '/console/finance',
+        '/console/finance/desktop/auth-callback',
         '/console/fieldpulse',
         '/console/fieldpulse/devices',
         '/console/fieldpulse/monitor',

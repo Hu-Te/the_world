@@ -232,11 +232,20 @@
                   v-for="m in SERVICE_OPTIONS"
                   :key="m.code"
                   class="admin-mod-card"
-                  :class="{ 'admin-mod-card--on': form.modules.includes(m.code) }">
+                  :class="{
+                    'admin-mod-card--on': form.modules.includes(m.code),
+                    'admin-mod-card--wip': m.wip,
+                  }"
+                  :style="{ '--accent': m.accent }"
+                  :title="m.title">
                   <input v-model="form.modules" type="checkbox" :value="m.code" />
-                  <strong>{{ m.short }}</strong>
+                  <span class="admin-mod-card__top">
+                    <strong>{{ m.short }}</strong>
+                    <span class="admin-mod-card__tag">{{ m.tag }}</span>
+                  </span>
                   <em>{{ m.name }}</em>
                   <i v-if="m.wip">暂未开发</i>
+                  <span v-else class="admin-mod-card__ready">可分配</span>
                 </label>
               </div>
             </fieldset>
@@ -304,11 +313,20 @@
                   v-for="m in SERVICE_OPTIONS"
                   :key="m.code"
                   class="admin-mod-card"
-                  :class="{ 'admin-mod-card--on': quotaModules.includes(m.code) }">
+                  :class="{
+                    'admin-mod-card--on': quotaModules.includes(m.code),
+                    'admin-mod-card--wip': m.wip,
+                  }"
+                  :style="{ '--accent': m.accent }"
+                  :title="m.title">
                   <input v-model="quotaModules" type="checkbox" :value="m.code" />
-                  <strong>{{ m.short }}</strong>
+                  <span class="admin-mod-card__top">
+                    <strong>{{ m.short }}</strong>
+                    <span class="admin-mod-card__tag">{{ m.tag }}</span>
+                  </span>
                   <em>{{ m.name }}</em>
                   <i v-if="m.wip">暂未开发</i>
+                  <span v-else class="admin-mod-card__ready">可分配</span>
                 </label>
               </div>
             </fieldset>
@@ -449,14 +467,38 @@ type UserRow = {
 }
 
 const SERVICE_OPTIONS = [
-  { code: 'FIELDPULSE', short: '01', name: 'PLC 管控', title: 'PLC 数据管控中心', wip: false },
-  { code: 'FINANCE', short: '03', name: '财务审计', title: '财务审计桌面（框架）', wip: true },
-  { code: 'PACK3D', short: '05', name: '包装设计', title: '软包装 3D', wip: true },
+  {
+    code: 'FIELDPULSE',
+    short: '01',
+    name: 'PLC 管控',
+    title: 'PLC 数据管控中心',
+    tag: '平台侧',
+    accent: '#6ec8e8',
+    wip: false,
+  },
+  {
+    code: 'FINANCE',
+    short: '03',
+    name: '财务离线桌面',
+    title: '仅离线 App：签发密钥 · 安装包分发',
+    tag: '离线 App',
+    accent: '#6ec4b8',
+    wip: false,
+  },
+  {
+    code: 'PACK3D',
+    short: '05',
+    name: '包装设计',
+    title: '软包装 3D 打样',
+    tag: '平台侧',
+    accent: '#7eb0c8',
+    wip: true,
+  },
 ] as const
 
 const MODULE_META: Record<string, { short: string; title: string; wip: boolean }> = {
   FIELDPULSE: { short: '01 PLC', title: 'PLC 数据管控中心', wip: false },
-  FINANCE: { short: '03 财务', title: '财务审计桌面（框架·本机隔离）', wip: true },
+  FINANCE: { short: '03 财务', title: '财务离线桌面（本机隔离）', wip: false },
   PACK3D: { short: '05 包装', title: '包装设计（暂未开发）', wip: true },
   ACCOUNT: { short: 'SYS', title: '账号中心', wip: false },
 }
@@ -1527,19 +1569,37 @@ async function submitForceLogout() {
 }
 
 .admin-mod-card {
+  --accent: #6ec8e8;
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  border-radius: 0.55rem;
+  gap: 0.28rem;
+  overflow: hidden;
+  border-radius: 0.65rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.28);
-  padding: 0.7rem 0.65rem 0.65rem;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 50%),
+    rgba(0, 0, 0, 0.28);
+  padding: 0.75rem 0.7rem 0.7rem;
   cursor: pointer;
   transition:
     border-color 0.15s,
     background 0.15s,
-    box-shadow 0.15s;
+    box-shadow 0.15s,
+    transform 0.15s;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.55rem;
+    bottom: 0.55rem;
+    width: 2px;
+    border-radius: 0 2px 2px 0;
+    background: var(--accent);
+    opacity: 0.4;
+    transition: opacity 0.15s;
+  }
 
   input {
     position: absolute;
@@ -1547,17 +1607,24 @@ async function submitForceLogout() {
     pointer-events: none;
   }
 
+  &:hover {
+    border-color: color-mix(in srgb, var(--accent) 45%, rgba(255, 255, 255, 0.12));
+    transform: translateY(-1px);
+  }
+
   strong {
     font-family: ui-monospace, 'IBM Plex Mono', monospace;
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-    color: #67e8f9;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    color: var(--accent);
   }
 
   em {
     font-style: normal;
-    font-size: 0.78rem;
-    color: #cbd5e1;
+    font-size: 0.82rem;
+    font-weight: 560;
+    letter-spacing: -0.01em;
+    color: #e2e8f0;
   }
 
   i {
@@ -1567,10 +1634,44 @@ async function submitForceLogout() {
   }
 
   &--on {
-    border-color: rgba(110, 200, 232, 0.55);
-    background: rgba(110, 200, 232, 0.12);
-    box-shadow: 0 0 18px rgba(34, 211, 238, 0.1);
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    background:
+      linear-gradient(145deg, color-mix(in srgb, var(--accent) 16%, transparent), transparent 55%),
+      rgba(8, 28, 40, 0.55);
+    box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 18%, transparent);
+
+    &::before {
+      opacity: 1;
+    }
   }
+
+  &--wip em {
+    color: #cbd5e1;
+  }
+}
+
+.admin-mod-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.admin-mod-card__tag {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.08rem 0.4rem;
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.admin-mod-card__ready {
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--accent) 75%, #94a3b8);
 }
 
 .admin-modal__select {

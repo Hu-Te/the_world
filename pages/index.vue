@@ -3,16 +3,16 @@
     <!-- 不用 ClientOnly：登录必须进 SSR/首屏，否则右上角会一直空 -->
     <IamCornerPortal @open="onIamOpen" />
     <ClientOnly>
-      <IamLoginModal v-model:open="openLogin" @success="onLoginSuccess" @close="openLogin = false" />
+      <IamLoginModal
+        v-model:open="openLogin"
+        @success="onLoginSuccess"
+        @close="openLogin = false" />
       <IamSystemSelectModal v-model:open="openSystems" @close="openSystems = false" />
     </ClientOnly>
 
     <section class="page-home__hero">
       <!-- 壳层常驻：Three 就绪前的深空测控加载首屏 -->
-      <div
-        class="page-home__fallback"
-        :class="{ 'is-gone': heroReady }"
-        aria-hidden="true">
+      <div class="page-home__fallback" :class="{ 'is-gone': heroReady }" aria-hidden="true">
         <div class="page-home__fallback-stars" />
         <div class="page-home__fallback-nebula" />
         <div class="page-home__fallback-grid" />
@@ -193,7 +193,9 @@ onUnmounted(clearTip)
       radial-gradient(ellipse 70% 50% at 18% 22%, rgba(14, 80, 110, 0.14) 0%, transparent 55%),
       radial-gradient(ellipse 80% 55% at 82% 18%, rgba(45, 160, 180, 0.1) 0%, transparent 50%),
       radial-gradient(ellipse 100% 90% at 50% 100%, #01040a 0%, #00050a 55%, #000208 100%);
-    transition: opacity 0.7s ease, visibility 0.7s ease;
+    transition:
+      opacity 0.7s ease,
+      visibility 0.7s ease;
 
     &.is-gone {
       opacity: 0;
@@ -242,7 +244,13 @@ onUnmounted(clearTip)
     @apply absolute inset-0;
     background:
       radial-gradient(ellipse 70% 60% at 50% 45%, transparent 40%, rgba(0, 2, 8, 0.55) 100%),
-      linear-gradient(180deg, rgba(0, 2, 8, 0.35) 0%, transparent 22%, transparent 70%, rgba(0, 2, 8, 0.65) 100%);
+      linear-gradient(
+        180deg,
+        rgba(0, 2, 8, 0.35) 0%,
+        transparent 22%,
+        transparent 70%,
+        rgba(0, 2, 8, 0.65) 100%
+      );
   }
 
   &__fallback-glow {
@@ -330,19 +338,18 @@ onUnmounted(clearTip)
     &--ticks {
       inset: 6%;
       border: none;
-      background:
-        conic-gradient(
-          from 0deg,
-          transparent 0deg 8deg,
-          rgba(165, 243, 252, 0.35) 8deg 9deg,
-          transparent 9deg 38deg,
-          rgba(110, 200, 232, 0.28) 38deg 39deg,
-          transparent 39deg 70deg,
-          rgba(165, 243, 252, 0.3) 70deg 71deg,
-          transparent 71deg 100deg,
-          rgba(110, 200, 232, 0.25) 100deg 101deg,
-          transparent 101deg 360deg
-        );
+      background: conic-gradient(
+        from 0deg,
+        transparent 0deg 8deg,
+        rgba(165, 243, 252, 0.35) 8deg 9deg,
+        transparent 9deg 38deg,
+        rgba(110, 200, 232, 0.28) 38deg 39deg,
+        transparent 39deg 70deg,
+        rgba(165, 243, 252, 0.3) 70deg 71deg,
+        transparent 71deg 100deg,
+        rgba(110, 200, 232, 0.25) 100deg 101deg,
+        transparent 101deg 360deg
+      );
       mask-image: radial-gradient(circle, transparent 68%, #000 69%, #000 71%, transparent 72%);
       animation: home-orbit-rev 28s linear infinite;
       opacity: 0.7;
@@ -388,15 +395,14 @@ onUnmounted(clearTip)
 
   &__fallback-core {
     @apply absolute left-1/2 top-1/2 h-[5rem] w-[5rem] -translate-x-1/2 -translate-y-1/2 rounded-full;
-    background:
-      radial-gradient(
-        circle at 35% 30%,
-        rgba(236, 254, 255, 0.95) 0%,
-        rgba(110, 200, 232, 0.55) 26%,
-        rgba(14, 116, 144, 0.32) 52%,
-        rgba(2, 20, 32, 0.15) 68%,
-        transparent 74%
-      );
+    background: radial-gradient(
+      circle at 35% 30%,
+      rgba(236, 254, 255, 0.95) 0%,
+      rgba(110, 200, 232, 0.55) 26%,
+      rgba(14, 116, 144, 0.32) 52%,
+      rgba(2, 20, 32, 0.15) 68%,
+      transparent 74%
+    );
     box-shadow:
       0 0 24px rgba(94, 234, 212, 0.45),
       0 0 70px rgba(56, 189, 248, 0.28),
@@ -438,7 +444,12 @@ onUnmounted(clearTip)
 
     i {
       @apply absolute inset-y-0 left-0 block w-2/5;
-      background: linear-gradient(90deg, transparent, rgba(94, 234, 212, 0.95), rgba(165, 243, 252, 0.4));
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(94, 234, 212, 0.95),
+        rgba(165, 243, 252, 0.4)
+      );
       box-shadow: 0 0 10px rgba(94, 234, 212, 0.55);
       animation: home-scanbar 1.8s ease-in-out infinite;
     }

@@ -9,137 +9,64 @@
 
     <main class="fin__main">
       <section class="fin__hero">
-        <p class="fin__eyebrow">FINANCE · Offline only</p>
         <h1 class="fin__title">财务离线桌面</h1>
-        <p class="fin__lead">
-          FINANCE 模块只服务离线 App：云端只做登录与密钥签发，核算数据只留在你的电脑里。
-        </p>
-      </section>
-
-      <section class="fin__pros" aria-label="产品优点">
-        <article class="fin__pro">
-          <h2>数据不出本机</h2>
-          <p>
-            业务库落在
-            <code>~/.hute/finance/{tenantId}/</code>
-            ，不写云 MySQL，和工具舱、工脉互不串库。
-          </p>
-        </article>
-        <article class="fin__pro">
-          <h2>同账号、少折腾</h2>
-          <p>开通 FINANCE 后用同一账号签发离线密钥；不做云端账套，也不另开一套账密。</p>
-        </article>
-        <article class="fin__pro">
-          <h2>安装即用</h2>
-          <p>
-            Windows
-            包内置运行时与本机服务，双击启动、浏览器登录即可；无需自备开发环境或手动健康检查。
-          </p>
-        </article>
-        <article class="fin__pro">
-          <h2>边界清晰</h2>
-          <p>
-            FINANCE ≠ 云端财务后台。云端只做密钥与安装包；正式核算只在本机 fin-app。
-          </p>
-        </article>
+        <p class="fin__lead">账做在你自己电脑上，网站只负责登录和下载安装包。</p>
+        <ul class="fin__points" aria-label="要点">
+          <li>账本数据只保存在本机，不上云</li>
+          <li>用现在这个账号就能打开，不用另注册</li>
+          <li>装好就能用，不用再配环境</li>
+        </ul>
       </section>
 
       <p v-if="pageError" class="fin__err">{{ pageError }}</p>
 
-      <section class="fin__auth" aria-label="离线授权">
-        <article class="fin__card fin__card--auth">
-          <h2 class="fin__h2">离线授权</h2>
-          <p class="fin__card-lead">
-            FINANCE 仅用于本机
-            <code>fin-app</code>
-            ：签发离线密钥（
-            <code>fintools://</code>
-            ），有网签一次后可纯离线。
-          </p>
-          <FinDesktopActions v-if="canIssueOffline" />
-          <p v-else class="fin__err">
-            当前账号未开通 FINANCE。请管理员在「账号管理」为该用户解锁 FINANCE 模块后再签发。
-          </p>
-        </article>
+      <section class="fin__panel">
+        <h2 class="fin__h2">1. 下载安装</h2>
+        <p class="fin__hint">选你电脑的系统下载，装好后回来点下面的「打开软件」。</p>
+
+        <div v-if="busy && dlProgress" class="fin__progress-row">
+          <div class="fin__progress">{{ dlProgress }}</div>
+          <button type="button" class="fin__stop" @click="stopDownload">停止</button>
+        </div>
+        <p v-if="dlOk" class="fin__ok">{{ dlOk }}</p>
+        <p v-if="dlError" class="fin__err">{{ dlError }}</p>
+
+        <div class="fin__downloads">
+          <button
+            type="button"
+            class="fin__dl fin__dl--primary"
+            :disabled="busy || !manifest?.macosArtifact"
+            @click="onDownload('macos')">
+            <span class="fin__dl-os">苹果电脑</span>
+            <span class="fin__dl-name">{{ busyPlatform === 'macos' ? '下载中…' : '下载安装包' }}</span>
+          </button>
+          <button
+            type="button"
+            class="fin__dl"
+            :disabled="busy || !manifest?.windowsArtifact"
+            @click="onDownload('windows')">
+            <span class="fin__dl-os">Windows</span>
+            <span class="fin__dl-name">{{ busyPlatform === 'windows' ? '下载中…' : '下载安装包' }}</span>
+          </button>
+        </div>
+
+        <ol class="fin__steps">
+          <li>
+            <strong>Windows</strong>
+            ：解压后双击打开软件。若系统拦截，选「仍要运行」。
+          </li>
+          <li>
+            <strong>苹果电脑</strong>
+            ：打开安装包，把软件拖到「应用程序」。若提示打不开，右键点软件再选「打开」。
+          </li>
+        </ol>
       </section>
 
-      <section class="fin__grid">
-        <article class="fin__card">
-          <h2 class="fin__h2">下载</h2>
-          <p class="fin__card-lead">
-            macOS：
-            <code>.dmg</code>
-            （独立桌面 App）；Windows：
-            <code>.zip</code>
-            （独立应用窗口 + 内置运行时，安装即用，无需浏览器打开网页）。
-          </p>
-
-          <div v-if="busy && dlProgress" class="fin__progress-row">
-            <div class="fin__progress">{{ dlProgress }}</div>
-            <button type="button" class="fin__stop" @click="stopDownload">停止下载</button>
-          </div>
-          <p v-if="dlOk" class="fin__ok">{{ dlOk }}</p>
-          <p v-if="dlError" class="fin__err">{{ dlError }}</p>
-
-          <div class="fin__downloads">
-            <button
-              type="button"
-              class="fin__dl fin__dl--primary"
-              :disabled="busy || !manifest?.macosArtifact"
-              @click="onDownload('macos')">
-              <span class="fin__dl-os">macOS</span>
-              <span class="fin__dl-name">
-                {{ busyPlatform === 'macos' ? '下载中…' : '下载 .dmg' }}
-              </span>
-              <span class="fin__dl-file">{{ manifest?.macosArtifact || '暂未打包' }}</span>
-            </button>
-            <button
-              type="button"
-              class="fin__dl"
-              :disabled="busy || !manifest?.windowsArtifact"
-              @click="onDownload('windows')">
-              <span class="fin__dl-os">Windows</span>
-              <span class="fin__dl-name">
-                {{ busyPlatform === 'windows' ? '下载中…' : '下载 .zip' }}
-              </span>
-              <span class="fin__dl-file">{{ manifest?.windowsArtifact || '暂未打包' }}</span>
-            </button>
-          </div>
-
-          <button type="button" class="fin__text-btn" :disabled="busy" @click="onReadme">
-            下载 README 说明
-          </button>
-        </article>
-
-        <article class="fin__card">
-          <h2 class="fin__h2">安装与使用</h2>
-          <ol class="fin__steps">
-            <li>下载对应平台安装包。</li>
-            <li>
-              <strong>Windows</strong>
-              ：解压
-              <code>.zip</code>
-              后双击
-              <code>FinanceDesktop.exe</code>
-              后打开 Electron
-              <code>fin-app</code>
-              。在本页点「生成密钥并打开桌面端」完成授权；若未唤起可复制 Deep Link。下载若被拦截，选「保留 / 仍要运行」。
-            </li>
-            <li>
-              <strong>macOS</strong>
-              ：挂载
-              <code>.dmg</code>
-              ，把 App 拖到「应用程序」。若提示已损坏，执行
-              <code>xattr -cr "/Applications/财务审计桌面.app"</code>
-              后再打开。
-            </li>
-            <li>
-              登录成功后本机数据自动落在用户目录下的
-              <code>.hute/finance/{tenantId}/</code>
-              。
-            </li>
-          </ol>
-        </article>
+      <section class="fin__panel fin__panel--focus">
+        <h2 class="fin__h2">2. 打开软件</h2>
+        <p class="fin__hint">先装好软件，再点这里。有网点一次就行，之后可离线用。</p>
+        <FinDesktopActions v-if="canIssueOffline" />
+        <p v-else class="fin__err">当前账号还不能用财务桌面，请联系管理员开通。</p>
       </section>
     </main>
   </div>
@@ -181,7 +108,7 @@ async function loadManifest() {
   try {
     manifest.value = await fetchFinanceDesktopManifest()
   } catch (e) {
-    dlError.value = e instanceof Error ? e.message : '清单加载失败'
+    dlError.value = e instanceof Error ? e.message : '暂时无法获取安装包，请稍后重试'
   }
 }
 
@@ -203,7 +130,7 @@ async function onDownload(platform: FinanceDesktopPlatform) {
   busyPlatform.value = platform
   dlError.value = ''
   dlOk.value = ''
-  dlProgress.value = '连接中…'
+  dlProgress.value = '正在连接…'
   try {
     const { filename, bytes } = await downloadFinanceDesktopPackage(
       platform,
@@ -219,7 +146,7 @@ async function onDownload(platform: FinanceDesktopPlatform) {
     )
     if (signal.aborted) return
     saveFinanceDesktopBlob(filename, bytes)
-    dlOk.value = `已开始保存 ${filename}（${formatMb(bytes.size)}）`
+    dlOk.value = `已开始保存（约 ${formatMb(bytes.size)}）`
     dlProgress.value = ''
   } catch (e) {
     if (e instanceof DownloadAbortedError || signal.aborted) {
@@ -238,39 +165,6 @@ async function onDownload(platform: FinanceDesktopPlatform) {
   }
 }
 
-async function onReadme() {
-  busy.value = true
-  dlError.value = ''
-  dlOk.value = ''
-  try {
-    const config = useRuntimeConfig()
-    const base = String(config.public.apiOrigin || '').replace(/\/$/, '')
-    auth.hydrate()
-    const res = await fetch(`${base}/api/console/finance/desktop/readme`, {
-      headers: {
-        Accept: 'text/plain',
-        ...(auth.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {}),
-      },
-    })
-    if (!res.ok) {
-      let msg = `下载失败 (${res.status})`
-      try {
-        const j = (await res.json()) as { message?: string }
-        if (j?.message) msg = j.message
-      } catch {
-        /* ignore */
-      }
-      throw new Error(msg)
-    }
-    saveFinanceDesktopBlob('finance-desktop-README.txt', await res.blob())
-    dlOk.value = '已下载说明文件'
-  } catch (e) {
-    dlError.value = e instanceof Error ? e.message : String(e)
-  } finally {
-    busy.value = false
-  }
-}
-
 onMounted(async () => {
   auth.hydrate()
   if (!auth.accessToken) {
@@ -279,7 +173,7 @@ onMounted(async () => {
   }
   const mods = auth.profile?.unlockedModules ?? []
   if (!auth.isSuperAdmin && !mods.map((m) => m.toUpperCase()).includes('FINANCE')) {
-    pageError.value = '当前账号未开通 FINANCE（该模块仅用于离线桌面 App）'
+    pageError.value = '当前账号还不能用财务桌面，请联系管理员开通。'
     return
   }
   await loadManifest()
@@ -288,11 +182,21 @@ onMounted(async () => {
 
 <style scoped lang="scss">
 .fin {
+  --fin-pad-x: clamp(0.9rem, 3.2vw, 1.5rem);
+  --fin-max: min(40rem, 100%);
   position: relative;
-  min-height: 100vh;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   color: #e8eef4;
   background: #061018;
-  overflow-x: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .fin__bg {
@@ -300,9 +204,8 @@ onMounted(async () => {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 70% 45% at 15% -5%, rgba(46, 160, 140, 0.18), transparent 55%),
-    radial-gradient(ellipse 50% 40% at 90% 10%, rgba(70, 120, 150, 0.12), transparent 50%),
-    linear-gradient(180deg, #0a1820 0%, #061018 40%, #040c12 100%);
+    radial-gradient(ellipse 70% 45% at 15% -5%, rgba(46, 160, 140, 0.16), transparent 55%),
+    linear-gradient(180deg, #0a1820 0%, #061018 45%, #040c12 100%);
 }
 
 .fin__nav {
@@ -310,19 +213,21 @@ onMounted(async () => {
   z-index: 1;
   display: flex;
   justify-content: space-between;
-  max-width: 56rem;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: var(--fin-max);
   margin: 0 auto;
-  padding: 1.25rem 1.5rem 0;
+  padding: calc(1rem + env(safe-area-inset-top, 0px)) var(--fin-pad-x) 0;
+  box-sizing: border-box;
 }
 
 .fin__nav-link {
   border: none;
   background: transparent;
   color: #7a93a8;
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
+  font-size: 0.82rem;
   cursor: pointer;
+  padding: 0.35rem 0;
 
   &:hover {
     color: #9fd8cc;
@@ -332,101 +237,74 @@ onMounted(async () => {
 .fin__main {
   position: relative;
   z-index: 1;
-  max-width: 56rem;
+  width: 100%;
+  max-width: var(--fin-max);
   margin: 0 auto;
-  padding: 1.5rem 1.5rem 3.5rem;
+  padding: 1.25rem var(--fin-pad-x) 2.75rem;
+  box-sizing: border-box;
+  display: grid;
+  gap: 1rem;
 }
 
 .fin__hero {
-  margin-bottom: 1.5rem;
-}
-
-.fin__eyebrow {
-  margin: 0;
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 0.68rem;
-  letter-spacing: 0.2em;
-  color: rgba(110, 196, 184, 0.92);
+  margin-bottom: 0.25rem;
 }
 
 .fin__title {
-  margin: 0.45rem 0 0;
+  margin: 0;
   font-family: 'Source Serif 4', 'Songti SC', 'Noto Serif SC', Georgia, serif;
-  font-size: clamp(1.85rem, 3.5vw, 2.4rem);
+  font-size: clamp(1.65rem, 5vw, 2.15rem);
   font-weight: 600;
   letter-spacing: -0.02em;
   color: #f4faf8;
+  line-height: 1.2;
 }
 
 .fin__lead {
-  margin: 0.65rem 0 0;
-  max-width: 36rem;
-  font-size: 0.98rem;
+  margin: 0.55rem 0 0;
+  font-size: clamp(0.95rem, 2.6vw, 1.05rem);
   line-height: 1.55;
-  color: #9aafbd;
+  color: #b7c9d4;
 }
 
-.fin__pros {
+.fin__points {
+  margin: 0.9rem 0 0;
+  padding: 0;
+  list-style: none;
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.75rem;
-  margin: 0 0 1.35rem;
+  gap: 0.4rem;
 
-  @media (min-width: 720px) {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-.fin__pro {
-  padding: 0.95rem 1.05rem;
-  border-left: 2px solid rgba(110, 196, 184, 0.5);
-  background: rgba(8, 20, 26, 0.55);
-
-  h2 {
-    margin: 0;
-    font-size: 0.92rem;
-    font-weight: 600;
-    color: #e8f4f0;
-  }
-
-  p {
-    margin: 0.4rem 0 0;
-    font-size: 0.84rem;
-    line-height: 1.5;
+  li {
+    position: relative;
+    padding-left: 0.95rem;
+    font-size: 0.9rem;
+    line-height: 1.45;
     color: #8aa0ae;
-  }
 
-  code {
-    font-size: 0.8em;
-    color: #c5e4dc;
-  }
-}
-
-.fin__auth {
-  margin-bottom: 1.25rem;
-}
-
-.fin__card--auth {
-  border-color: rgba(159, 216, 204, 0.28);
-  background: linear-gradient(165deg, rgba(46, 160, 140, 0.12), rgba(8, 24, 32, 0.65));
-}
-
-.fin__grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
-
-  @media (min-width: 860px) {
-    grid-template-columns: 1fr 1fr;
-    align-items: start;
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0.55em;
+      width: 0.35rem;
+      height: 0.35rem;
+      border-radius: 50%;
+      background: #6ec4b8;
+    }
   }
 }
 
-.fin__card {
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(10, 22, 30, 0.72);
-  padding: 1.25rem 1.3rem 1.35rem;
-  backdrop-filter: blur(8px);
+.fin__panel {
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(10, 22, 30, 0.7);
+  padding: clamp(1rem, 2.8vw, 1.25rem);
+  box-sizing: border-box;
+
+  &--focus {
+    border-color: rgba(159, 216, 204, 0.28);
+    background: linear-gradient(165deg, rgba(46, 160, 140, 0.12), rgba(8, 24, 32, 0.65));
+  }
 }
 
 .fin__h2 {
@@ -436,40 +314,34 @@ onMounted(async () => {
   color: #e8f0f4;
 }
 
-.fin__card-lead {
-  margin: 0.55rem 0 0;
+.fin__hint {
+  margin: 0.4rem 0 0;
   font-size: 0.88rem;
   line-height: 1.5;
   color: #8499a8;
-
-  code {
-    font-size: 0.85em;
-    color: #c5e4dc;
-  }
 }
 
 .fin__downloads {
   display: grid;
-  gap: 0.65rem;
-  margin-top: 1rem;
+  gap: 0.55rem;
+  margin-top: 0.95rem;
+
+  @media (min-width: 520px) {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .fin__dl {
   display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 0.85rem;
-  row-gap: 0.15rem;
+  gap: 0.15rem;
   width: 100%;
+  box-sizing: border-box;
   text-align: left;
   border: 1px solid rgba(148, 163, 184, 0.22);
   background: rgba(4, 14, 18, 0.55);
   padding: 0.85rem 1rem;
   color: inherit;
   cursor: pointer;
-  transition:
-    border-color 0.15s,
-    background 0.15s;
 
   &:hover:not(:disabled) {
     border-color: rgba(110, 196, 184, 0.5);
@@ -488,31 +360,21 @@ onMounted(async () => {
 }
 
 .fin__dl-os {
-  grid-row: 1 / 3;
-  align-self: center;
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 0.68rem;
-  letter-spacing: 0.12em;
+  font-size: 0.78rem;
   color: #6ec4b8;
 }
 
 .fin__dl-name {
-  font-size: 0.95rem;
+  font-size: 0.98rem;
   font-weight: 560;
   color: #eef6f4;
 }
 
-.fin__dl-file {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 0.68rem;
-  color: #7a93a8;
-}
-
 .fin__steps {
-  margin: 0.9rem 0 0;
+  margin: 0.95rem 0 0;
   padding-left: 1.15rem;
   display: grid;
-  gap: 0.55rem;
+  gap: 0.45rem;
   font-size: 0.88rem;
   line-height: 1.5;
   color: #a8bcc8;
@@ -520,36 +382,13 @@ onMounted(async () => {
   strong {
     color: #cfe8e0;
   }
-
-  code {
-    font-size: 0.8em;
-    color: #c5e4dc;
-  }
-}
-
-.fin__text-btn {
-  margin-top: 0.85rem;
-  border: none;
-  border-bottom: 1px solid rgba(110, 196, 184, 0.35);
-  background: transparent;
-  padding: 0 0 1px;
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  color: #9fd8cc;
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
 }
 
 .fin__progress-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem 1rem;
+  gap: 0.65rem 0.9rem;
   margin-top: 0.65rem;
 }
 
@@ -563,26 +402,21 @@ onMounted(async () => {
 .fin__stop {
   border: 1px solid rgba(248, 113, 113, 0.45);
   background: rgba(127, 29, 29, 0.35);
-  padding: 0.35rem 0.75rem;
+  padding: 0.3rem 0.65rem;
   color: #fecaca;
   font-size: 0.78rem;
-  letter-spacing: 0.04em;
   cursor: pointer;
-
-  &:hover {
-    border-color: rgba(248, 113, 113, 0.7);
-    color: #fff;
-  }
 }
 
 .fin__ok {
-  margin-top: 0.65rem;
+  margin-top: 0.55rem;
   color: #86efac;
 }
 
 .fin__err {
-  margin: 0.65rem 0 0;
+  margin: 0.55rem 0 0;
   color: #fca5a5;
   font-size: 0.88rem;
+  overflow-wrap: anywhere;
 }
 </style>

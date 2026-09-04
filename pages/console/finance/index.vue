@@ -26,7 +26,6 @@
 
         <div v-if="busy && dlProgress" class="fin__progress-row">
           <div class="fin__progress">{{ dlProgress }}</div>
-          <button type="button" class="fin__stop" @click="stopDownload">停止</button>
         </div>
         <p v-if="dlOk" class="fin__ok">{{ dlOk }}</p>
         <p v-if="dlError" class="fin__err">{{ dlError }}</p>
@@ -74,11 +73,9 @@
 
 <script setup lang="ts">
 import {
-  DownloadAbortedError,
-  downloadFinanceDesktopPackage,
+  issueFinanceDesktopDownloadTicket,
   fetchFinanceDesktopManifest,
-  formatMb,
-  saveFinanceDesktopBlob,
+  startFinanceDesktopNativeDownload,
   type FinanceDesktopManifest,
   type FinanceDesktopPlatform,
 } from '~/utils/finance-desktop/distributionApi'
@@ -102,7 +99,6 @@ const busyPlatform = ref<FinanceDesktopPlatform | null>(null)
 const dlProgress = ref('')
 const dlOk = ref('')
 const dlError = ref('')
-let downloadAbort: AbortController | null = null
 
 async function loadManifest() {
   try {
@@ -112,54 +108,21 @@ async function loadManifest() {
   }
 }
 
-function stopDownload() {
-  downloadAbort?.abort()
-  downloadAbort = null
-  dlProgress.value = ''
-  dlOk.value = ''
-  dlError.value = '已停止下载'
-  busy.value = false
-  busyPlatform.value = null
-}
-
 async function onDownload(platform: FinanceDesktopPlatform) {
-  downloadAbort?.abort()
-  downloadAbort = new AbortController()
-  const signal = downloadAbort.signal
   busy.value = true
   busyPlatform.value = platform
   dlError.value = ''
   dlOk.value = ''
-  dlProgress.value = '正在连接…'
+  dlProgress.value = '正在准备下载…'
   try {
-    const { filename, bytes } = await downloadFinanceDesktopPackage(
-      platform,
-      (loaded, total) => {
-        if (total != null && total > 0) {
-          const pct = Math.min(100, Math.round((loaded / total) * 100))
-          dlProgress.value = `已下载 ${formatMb(loaded)} / ${formatMb(total)}（${pct}%）`
-        } else {
-          dlProgress.value = `已下载 ${formatMb(loaded)}`
-        }
-      },
-      signal,
-    )
-    if (signal.aborted) return
-    saveFinanceDesktopBlob(filename, bytes)
-    dlOk.value = `已开始保存（约 ${formatMb(bytes.size)}）`
+    const ticket = await issueFinanceDesktopDownloadTicket(platform)
+    startFinanceDesktopNativeDownload(ticket)
+    dlOk.value = `已交给浏览器下载 ${ticket.filename}，请在下载栏查看进度`
     dlProgress.value = ''
   } catch (e) {
-    if (e instanceof DownloadAbortedError || signal.aborted) {
-      dlError.value = '已停止下载'
-      dlProgress.value = ''
-      return
-    }
     dlError.value = e instanceof Error ? e.message : String(e)
     dlProgress.value = ''
   } finally {
-    if (downloadAbort?.signal === signal) {
-      downloadAbort = null
-    }
     busy.value = false
     busyPlatform.value = null
   }

@@ -50,6 +50,40 @@ export function fetchFinanceDesktopManifest() {
   return apiFetch<FinanceDesktopManifest>(`${BASE}/manifest`)
 }
 
+export type FinanceDesktopDownloadTicket = {
+  downloadPath?: string | null
+  downloadUrl?: string | null
+  filename: string
+}
+
+/** 签发短时下载 URL（优先 COS/CDN 绝对地址，否则本站 X-Accel）。 */
+export async function issueFinanceDesktopDownloadTicket(
+  platform: FinanceDesktopPlatform,
+): Promise<FinanceDesktopDownloadTicket> {
+  return apiFetch<FinanceDesktopDownloadTicket>(
+    `${BASE}/download-ticket?platform=${encodeURIComponent(platform)}`,
+    { method: 'POST' },
+  )
+}
+
+/** 浏览器下载栏拉取安装包（勿再用 fetch 拼 Blob）。 */
+export function startFinanceDesktopNativeDownload(ticket: FinanceDesktopDownloadTicket) {
+  const absolute = (ticket.downloadUrl || '').trim()
+  const path = (ticket.downloadPath || '').trim()
+  const url = absolute || (path ? `${apiOrigin()}${path}` : '')
+  if (!url) {
+    throw new Error('下载地址为空')
+  }
+  const a = document.createElement('a')
+  a.href = url
+  a.target = '_blank'
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+
+/** @deprecated 大包请用 issueFinanceDesktopDownloadTicket + startFinanceDesktopNativeDownload */
 export async function downloadFinanceDesktopPackage(
   platform: FinanceDesktopPlatform,
   onProgress?: (loaded: number, total: number | null) => void,
